@@ -1,0 +1,7 @@
+{
+    "name": "sport-complex-deployment",
+    "version": "1.0.0",
+    "scripts": {
+        "build": "cd back && npm install && npm run build && cd .. && rm -rf dist && mkdir dist && cp -r back/dist/* dist/ && mkdir dist/admin && cp -r front/* dist/admin/"
+    }
+}
