@@ -1,0 +1,7 @@
+# Firebase credentials — never commit real API keys!
+firebase-config.js
+
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+.vscode/
