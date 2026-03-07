@@ -140,7 +140,7 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
             <div className="space-y-3">
               <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Activity size={16} className="text-blue-500" /> Select Sport</label>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                {['Badminton', 'Football', 'Tennis', 'Running'].map(sport => (
+                {['Badminton', 'Football', 'Basketball', 'Tennis', 'Swimming'].map(sport => (
                   <button
                     key={sport}
                     type="button"

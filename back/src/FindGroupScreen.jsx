@@ -50,7 +50,7 @@ const FindGroupScreen = ({ setCurrentScreen, onSelectMatch, user }) => {
 
       <div className="px-6 mt-6">
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
-          {['All', 'Badminton', 'Tennis', 'Football'].map((tab, i) => (
+          {['All', 'Badminton', 'Football', 'Basketball', 'Tennis', 'Swimming'].map((tab, i) => (
             <button
               key={tab}
               onClick={() => setSelectedSportTab(tab)}
