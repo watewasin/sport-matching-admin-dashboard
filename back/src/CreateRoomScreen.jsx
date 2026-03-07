@@ -71,6 +71,20 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
       const sportRates = { 'badminton': 350, 'football': 1200, 'tennis': 700, 'basketball': 800, 'swimming': 500 };
       const ratePerHour = sportRates[selectedSport.toLowerCase()] || 600;
 
+      // Calculate local timezone date (solves the UTC previous-day bug)
+      const today = new Date();
+      const localDateIso = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+      // Map sport to exact Stadium ID (matching Admin Dashboard config)
+      const sportToStadiumMap = {
+        'badminton': 'STD-001',
+        'football': 'STD-002',
+        'basketball': 'STD-002',
+        'tennis': 'STD-003',
+        'swimming': 'STD-003'
+      };
+      const mappedStadiumId = sportToStadiumMap[selectedSport.toLowerCase()] || 'STD-003';
+
       const newBooking = {
         // App-specific fields
         Level: level,
@@ -90,10 +104,10 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
         status: 'reserved',            // App bookings are assumed reserved
         source: 'app',
         currentStage: 'pending',
-        stadiumId: 'STD-001',          // default placeholder for dashboard
+        stadiumId: mappedStadiumId,
         price: (end24 - start24) * ratePerHour,
         isPaid: false,
-        date: new Date().toISOString().split('T')[0] // Defaults to today
+        date: localDateIso
       };
 
       const docRef = await addDoc(collection(db, 'bookings'), newBooking);
