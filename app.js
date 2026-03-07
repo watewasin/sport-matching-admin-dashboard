@@ -1409,6 +1409,10 @@ function initWalkInModal() {
 
         const newBooking = {
             id: `BK-${Math.floor(Date.now() / 1000)}`,
+            sport,                          // ← required for Firestore query filter
+            court,                          // ← required for table display
+            courtId: court,
+            time,                           // ← required for table display e.g. "09:00 – 10:00"
             startH,
             endH,
             name: name || 'Walk-in',
@@ -1416,11 +1420,10 @@ function initWalkInModal() {
             status: 'walk-in',
             source: 'walk-in',
             currentStage: 'pending',
-            courtId: court,
             stadiumId: currentStadium ? currentStadium.id : 'unknown',
             price: (endH - startH) * (SPORT_RATES[sport] || 600),
             isPaid: false,
-            date: selectedCalendarDate.toISOString().split('T')[0]
+            date: selectedCalendarDate.toISOString().split('T')[0],
         };
 
         // ── FIRESTORE: Save new booking ──
