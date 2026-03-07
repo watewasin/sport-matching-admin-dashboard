@@ -128,7 +128,7 @@ async function generateAllBookings(sports) {
                 date: 'Today',
                 time: b.time,
                 status: b.status,
-                amount: `฿${(m.ratePerHour * hours).toLocaleString()}`,
+                amount: b.price !== undefined ? `฿${b.price.toLocaleString()}` : `฿${(m.ratePerHour * hours).toLocaleString()}`,
             });
         });
     }
@@ -943,7 +943,7 @@ function bSetState(sport, court, startH, newState) {
 }
 
 // ── Hourly rates (THB) ──
-const SPORT_RATES = { football: 1200, basketball: 800, swimming: 500, tennis: 700, badminton: 400 };
+
 
 // ── Corner icon SVGs ──
 const BLOCK_ICONS = {
@@ -1100,7 +1100,7 @@ function showActionPopover(e, b, court, sport) {
 
     const m = SPORT_META[sport];
     const hours = b.endH - b.startH;
-    const amount = hours * (SPORT_RATES[sport] || 600);
+    const amount = b.price !== undefined ? b.price : hours * (m.ratePerHour || 600);
     const timeStr = `${String(b.startH).padStart(2, '0')}:00 – ${String(b.endH).padStart(2, '0')}:00`;
 
     // ── Resolve current state from the machine ──
@@ -1421,7 +1421,7 @@ function initWalkInModal() {
             source: 'walk-in',
             currentStage: 'pending',
             stadiumId: currentStadium ? currentStadium.id : 'unknown',
-            price: (endH - startH) * (SPORT_RATES[sport] || 600),
+            price: (endH - startH) * (SPORT_META[sport].ratePerHour || 600),
             isPaid: false,
             date: selectedCalendarDate.toISOString().split('T')[0],
         };
