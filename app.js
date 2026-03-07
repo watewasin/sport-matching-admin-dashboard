@@ -1388,7 +1388,7 @@ function initWalkInModal() {
         if (el_) el_.addEventListener('change', checkAvailability);
     });
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = $('#walkin-name').value.trim();
         const phone = $('#walkin-phone') ? $('#walkin-phone').value.trim() : '';
@@ -1428,8 +1428,12 @@ function initWalkInModal() {
 
         // ── FIRESTORE: Save new booking ──
         if (isFirebaseReady()) {
-            window.db.collection('bookings').add(newBooking)
-                .catch(err => console.warn('Firestore add failed:', err.message));
+            try {
+                // Wait for the save so that the table refresh fetches it
+                await window.db.collection('bookings').add(newBooking);
+            } catch (err) {
+                console.warn('Firestore add failed:', err.message);
+            }
         }
 
         // ── Also inject locally so timeline updates instantly (optimistic UI) ──
@@ -1442,9 +1446,12 @@ function initWalkInModal() {
         closeModal();
         showToast(`✅ Booked! ${SPORT_META[sport].icon} ${name} · ${court} · ${time}`);
 
-        // Re-render timeline if the booking is for the currently viewed sport
-        if (sport === activeSport) {
+        // Re-render the active view
+        if (activeView === 'overview' && sport === activeSport) {
             renderTimeline(sport);
+        } else if (activeView === 'bookings') {
+            renderBookingsChart();
+            renderBookingsTable();
         }
     });
 }
