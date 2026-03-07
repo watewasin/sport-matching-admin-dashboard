@@ -71,57 +71,11 @@ const STADIUMS = {
     },
 };
 
-// Mock occupancy data (status: occupied | available | reserved)
-const OCCUPANCY_DATA = {
-    football: [
-        { court: 'Pitch A', status: 'occupied', detail: 'FC Rangers — ends 14:00', customer: 'FC Rangers' },
-        { court: 'Pitch B', status: 'available', detail: 'Free until 16:00' },
-        { court: 'Pitch C', status: 'reserved', detail: 'Reserved 15:00–17:00', customer: 'City United' },
-    ],
-    basketball: [
-        { court: 'Court 1', status: 'occupied', detail: 'Thunder Hawks — ends 13:30', customer: 'Thunder Hawks' },
-        { court: 'Court 2', status: 'available', detail: 'Free all afternoon' },
-    ],
-    swimming: [
-        { court: 'Pool A', status: 'available', detail: 'Open lane swimming' },
-        { court: 'Pool B', status: 'reserved', detail: 'Swim Club 16:00–18:00' },
-    ],
-    tennis: [
-        { court: 'Court T1', status: 'occupied', detail: 'Doubles match — ends 13:00' },
-        { court: 'Court T2', status: 'available', detail: 'Free' },
-        { court: 'Court T3', status: 'reserved', detail: 'Tournament 15:00–17:00' },
-    ],
-    badminton: [
-        { court: 'Hall A', status: 'occupied', detail: 'Club training — ends 14:00' },
-        { court: 'Hall B', status: 'available', detail: 'Free' },
-        { court: 'Hall C', status: 'available', detail: 'Free' },
-        { court: 'Hall D', status: 'reserved', detail: 'Reserved 15:00' },
-    ],
-};
+// Occupancy data — populated dynamically from Firestore
+const OCCUPANCY_DATA = {};
 
-// Revenue data (week / month)
-const REVENUE_DATA = {
-    football: {
-        week: [3200, 2800, 4100, 3600, 5200, 4800, 6100],
-        month: [82000, 74000, 91000, 88000],
-    },
-    basketball: {
-        week: [1800, 2200, 1600, 2900, 3100, 2600, 3400],
-        month: [54000, 61000, 58000, 67000],
-    },
-    swimming: {
-        week: [1200, 980, 1500, 1400, 1800, 1600, 2100],
-        month: [38000, 42000, 39000, 45000],
-    },
-    tennis: {
-        week: [2100, 1800, 2600, 2400, 3000, 2800, 3500],
-        month: [65000, 58000, 72000, 69000],
-    },
-    badminton: {
-        week: [900, 1100, 850, 1300, 1500, 1200, 1700],
-        month: [28000, 32000, 29000, 36000],
-    },
-};
+// Revenue data — populated dynamically from Firestore
+const REVENUE_DATA = {};
 
 // ══════════════════════════════════════════════════════
 // FIREBASE FIRESTORE — Helper to check if DB is ready
@@ -150,99 +104,36 @@ async function fetchBookingsForDate(dateStr, sport) {
     }
 }
 
-// ── Mock fallback (used while Firebase is not yet wired up) ──
+// ── Mock fallback (returns empty — Firestore is the real source now) ──
 function getMockBookings(sport) {
-    const mockDb = {
-        football: [
-            { time: '08:00 – 09:00', name: 'Santos FC', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1001' },
-            { time: '10:00 – 12:00', name: 'FC Rangers', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-1002' },
-            { time: '13:00 – 14:00', name: 'Walk-in Customer', court: 'Pitch B', courtId: 'Pitch B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-1003' },
-            { time: '15:00 – 17:00', name: 'City United', court: 'Pitch C', courtId: 'Pitch C', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1004' },
-        ],
-        basketball: [
-            { time: '09:00 – 11:00', name: 'Thunder Hawks', court: 'Court 1', courtId: 'Court 1', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-2001' },
-            { time: '13:00 – 14:00', name: 'Urban Ballers', court: 'Court 2', courtId: 'Court 2', status: 'walk-in', currentStage: 'checked-in', source: 'walk-in', isPaid: false, id: 'BK-2002' },
-            { time: '17:00 – 19:00', name: 'Weekend Warriors', court: 'Court 1', courtId: 'Court 1', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-2003' },
-        ],
-        swimming: [
-            { time: '06:00 – 07:00', name: 'Morning Swim Club', court: 'Pool A', courtId: 'Pool A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-3001' },
-            { time: '16:00 – 18:00', name: 'Swim Academy', court: 'Pool B', courtId: 'Pool B', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-3002' },
-        ],
-        tennis: [
-            { time: '08:00 – 10:00', name: 'Alex Johnson', court: 'Court T1', courtId: 'Court T1', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-4001' },
-            { time: '11:00 – 13:00', name: 'Doubles Pair', court: 'Court T2', courtId: 'Court T2', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-4002' },
-            { time: '15:00 – 17:00', name: 'Tennis Tournament', court: 'Court T3', courtId: 'Court T3', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-4003' },
-        ],
-        badminton: [
-            { time: '07:00 – 09:00', name: 'Badminton Club', court: 'Hall A', courtId: 'Hall A', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-5001' },
-            { time: '12:00 – 13:00', name: 'Walk-in Pair', court: 'Hall B', courtId: 'Hall B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-5002' },
-        ],
-    };
-    return mockDb[sport] || [];
+    return []; // No demo data — connect Firebase to see real bookings
 }
 
 // Full bookings list for table
+// Full bookings list for table — fetches real data from Firestore
 async function generateAllBookings(sports) {
     const all = [];
-    const customerNames = [
-        'Maria Lopez', 'David Chen', 'Sunita Patel', 'Jake Wilson', 'Emma Thompson',
-        'Liam O\'Connor', 'Yuki Tanaka', 'Sarah Jenkins', 'Carlos Mendez', 'Aisha Khan',
-        'Thomas Wright', 'Hanna Berg', 'Lucas Silva', 'Elena Popova', 'Kevin Ng'
-    ];
-
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 1. Current bookings (Today) - fetched dynamically
     for (const sport of sports) {
         const bookings = await fetchBookingsForDate(todayStr, sport);
         bookings.forEach(b => {
+            const m = SPORT_META[sport];
+            const hours = b.endH && b.startH ? b.endH - b.startH : 1;
             all.push({
                 id: b.id,
                 name: b.name,
                 sport,
-                court: b.court,
+                court: b.court || b.courtId,
                 date: 'Today',
                 time: b.time,
                 status: b.status,
-                amount: `฿${(SPORT_META[sport].ratePerHour * (b.time.includes('–') ? 1 : 1)).toLocaleString()}`,
+                amount: `฿${(m.ratePerHour * hours).toLocaleString()}`,
             });
         });
     }
 
-    // 2. Substantial History (Past 30 Days)
-    sports.forEach(sport => {
-        const m = SPORT_META[sport];
-        // Generate ~10-15 past bookings per sport
-        for (let i = 1; i <= 15; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-
-            // Random number of bookings per day (0-2)
-            const count = Math.floor(Math.random() * 3);
-            for (let j = 0; j < count; j++) {
-                const hour = 8 + Math.floor(Math.random() * 12);
-                const duration = Math.floor(Math.random() * 2) + 1;
-                all.push({
-                    id: `BK-${2000 + Math.floor(Math.random() * 8000)}`,
-                    name: customerNames[Math.floor(Math.random() * customerNames.length)],
-                    sport,
-                    court: m.courts[Math.floor(Math.random() * m.courts.length)],
-                    date: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                    time: `${String(hour).padStart(2, '0')}:00 – ${String(hour + duration).padStart(2, '0')}:00`,
-                    status: Math.random() > 0.3 ? 'completed' : 'walk-in',
-                    amount: `฿${(m.ratePerHour * duration).toLocaleString()}`,
-                });
-            }
-        }
-    });
-
-    // Sort by date (descending) - Today first, then most recent past
-    return all.sort((a, b) => {
-        if (a.date === 'Today' && b.date !== 'Today') return -1;
-        if (a.date !== 'Today' && b.date === 'Today') return 1;
-        if (a.date === 'Today' && b.date === 'Today') return 0;
-        return new Date(b.date) - new Date(a.date);
-    });
+    return all;
 }
 
 // ═══════════════════════════════════════════
@@ -838,70 +729,12 @@ const TL_START_HOUR = 8;   // 08:00
 const TL_END_HOUR = 21;  // 21:00
 const TL_HOURS = Array.from({ length: TL_END_HOUR - TL_START_HOUR + 1 }, (_, i) => TL_START_HOUR + i);
 
-// Timeline bookings: per sport, keyed by court, each booking has startH, endH, name, status, etc.
-const TL_BOOKINGS = {
-    football: {
-        'Pitch A': [
-            { startH: 8, endH: 9, name: 'Santos FC', phone: '+66 81-234-5678', courtId: 'Pitch A', source: 'app', status: 'confirmed', currentStage: 'pending', isPaid: true, openMatch: '6/10' },
-            { startH: 10, endH: 12, name: 'FC Rangers', phone: '+66 89-876-5432', courtId: 'Pitch A', source: 'app', status: 'confirmed', currentStage: 'checked-in', isPaid: true, openMatch: '8/10' },
-            { startH: 13, endH: 14, name: 'Walk-in', phone: '+66 92-111-2233', courtId: 'Pitch A', source: 'walk-in', status: 'walk-in', currentStage: 'pending', isPaid: false },
-        ],
-        'Pitch B': [
-            { startH: 9, endH: 11, name: 'City Lions', phone: '+66 85-555-0101', courtId: 'Pitch B', source: 'app', status: 'reserved', currentStage: 'pending', isPaid: false },
-            { startH: 15, endH: 17, name: 'Weekend League', phone: '+66 81-999-0000', courtId: 'Pitch B', source: 'app', status: 'confirmed', currentStage: 'pending', isPaid: true, openMatch: '9/12' },
-        ],
-        'Pitch C': [
-            { startH: 15, endH: 17, name: 'Club Training', phone: '+66 62-456-7890', courtId: 'Pitch C', source: 'app', status: 'reserved', currentStage: 'completed', isPaid: true },
-        ],
-    },
-    basketball: {
-        'Court 1': [
-            { startH: 9, endH: 11, name: 'Thunder Hawks', phone: '+66 91-234-5000', courtId: 'Court 1', source: 'app', status: 'confirmed', currentStage: 'completed', isPaid: true, openMatch: '4/5' },
-            { startH: 17, endH: 19, name: 'Weekend Warriors', phone: '+66 80-777-8888', courtId: 'Court 1', source: 'walk-in', status: 'reserved', currentStage: 'pending', isPaid: false },
-        ],
-        'Court 2': [
-            { startH: 13, endH: 14, name: 'Urban Ballers', phone: '+66 93-100-2200', courtId: 'Court 2', source: 'walk-in', status: 'walk-in', currentStage: 'checked-in', isPaid: false, openMatch: '3/5' },
-            { startH: 15, endH: 17, name: 'Flash Team', phone: '+66 88-654-3210', courtId: 'Court 2', source: 'app', status: 'confirmed', currentStage: 'pending', isPaid: true },
-        ],
-    },
-    swimming: {
-        'Pool A': [
-            { startH: 6, endH: 7, name: 'Morning Club', phone: '+66 86-222-3344', courtId: 'Pool A', source: 'app', status: 'confirmed', currentStage: 'pending', isPaid: true },
-            { startH: 10, endH: 12, name: 'Private Lesson', phone: '+66 65-909-1122', courtId: 'Pool A', source: 'app', status: 'reserved', currentStage: 'pending', isPaid: false },
-        ],
-        'Pool B': [
-            { startH: 16, endH: 18, name: 'Swim Academy', phone: '+66 97-345-6781', courtId: 'Pool B', source: 'walk-in', status: 'reserved', currentStage: 'checked-in', isPaid: false },
-        ],
-    },
-    tennis: {
-        'Court T1': [
-            { startH: 8, endH: 10, name: 'Alex Johnson', phone: '+66 81-101-0202', courtId: 'Court T1', source: 'app', status: 'confirmed', currentStage: 'checked-in', isPaid: true },
-            { startH: 14, endH: 16, name: 'Ladies Match', phone: '+66 92-303-0404', courtId: 'Court T1', source: 'app', status: 'confirmed', currentStage: 'pending', isPaid: true },
-        ],
-        'Court T2': [
-            { startH: 11, endH: 13, name: 'Doubles Pair', phone: '+66 64-505-0606', courtId: 'Court T2', source: 'walk-in', status: 'walk-in', currentStage: 'pending', isPaid: false },
-        ],
-        'Court T3': [
-            { startH: 15, endH: 17, name: 'Tournament', phone: '+66 85-707-0808', courtId: 'Court T3', source: 'app', status: 'confirmed', currentStage: 'pending', isPaid: true },
-        ],
-    },
-    badminton: {
-        'Hall A': [
-            { startH: 7, endH: 9, name: 'Badminton Club', phone: '+66 83-909-1010', courtId: 'Hall A', source: 'app', status: 'confirmed', currentStage: 'completed', isPaid: true, openMatch: '10/12' },
-            { startH: 14, endH: 16, name: 'Club Session', phone: '+66 89-121-3141', courtId: 'Hall A', source: 'app', status: 'reserved', currentStage: 'pending', isPaid: false },
-        ],
-        'Hall B': [
-            { startH: 12, endH: 13, name: 'Walk-in Pair', phone: '+66 96-516-1718', courtId: 'Hall B', source: 'walk-in', status: 'walk-in', currentStage: 'pending', isPaid: false },
-        ],
-        'Hall C': [],
-        'Hall D': [
-            { startH: 18, endH: 20, name: 'Evening League', phone: '+66 61-192-0212', courtId: 'Hall D', source: 'app', status: 'reserved', currentStage: 'pending', isPaid: true },
-        ],
-    },
-};
+// ── Timeline bookings: populated from Firestore on date selection ──
+const TL_BOOKINGS = {};
 
-// Days that have mock 'alternate' bookings (reuse same TL data for demo)
-const BOOKED_DAYS_SET = new Set([2, 5, 7, 10, 11, 14, 18, 19, 21, 25, 28]);
+// Days with bookings — populated dynamically from Firestore
+const BOOKED_DAYS_SET = new Set();
+
 
 // Picker state: what year is displayed inside the picker
 let pickerYear = new Date().getFullYear();
