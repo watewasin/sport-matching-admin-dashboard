@@ -412,6 +412,21 @@
 
             <!-- ── VIEW: BOOKINGS ── -->
             <div class="view" id="view-bookings">
+                <!-- Bookings by Time chart -->
+                <section class="card" style="padding:2rem; margin-bottom:1.5rem">
+                    <div class="card-header" style="margin-bottom:1.25rem">
+                        <div>
+                            <h2 class="card-title">Bookings by Time Slot</h2>
+                            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem">Peak hours across
+                                all courts today</p>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height:240px">
+                        <canvas id="bookings-time-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Bookings Table -->
                 <section class="card" style="padding:2rem">
                     <div class="card-header">
                         <h2 class="card-title">All Bookings</h2>

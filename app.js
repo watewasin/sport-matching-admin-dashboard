@@ -465,7 +465,7 @@ function switchView(view) {
     const labels = { overview: 'Overview', bookings: 'Bookings', revenue: 'Revenue', settings: 'Settings' };
     $('#topbar-page').textContent = labels[view] || view;
 
-    if (view === 'bookings') renderBookingsTable();
+    if (view === 'bookings') { renderBookingsChart(); renderBookingsTable(); }
     if (view === 'revenue') renderRevenueView();
 }
 
@@ -474,10 +474,10 @@ function switchView(view) {
 // ═══════════════════════════════════════════
 function renderOverview() {
     const sport = activeSport;
-    renderStats(sport);
+    renderStats(sport);   // async — fires and updates in background
     renderDayChips();
     renderTimeline(sport);
-    renderBookingsTable();
+    renderBookingsTable(); // async — fires and updates in background
 }
 
 // ── Stats ──
@@ -643,11 +643,84 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+
+// ── Bookings Time Slot Chart ──
+let bookingsTimeChart = null;
+function renderBookingsChart() {
+    if (!currentStadium || !activeSport) return;
+    const ctx = $('#bookings-time-chart');
+    if (!ctx) return;
+
+    const m = SPORT_META[activeSport];
+
+    // Count bookings per hour slot (08:00 – 21:00) from TL_BOOKINGS
+    const hourCounts = {};
+    for (let h = TL_START_HOUR; h < TL_END_HOUR; h++) hourCounts[h] = 0;
+
+    const sportBookings = TL_BOOKINGS[activeSport] || {};
+    Object.values(sportBookings).forEach(courtArr => {
+        courtArr.forEach(b => {
+            for (let h = b.startH; h < b.endH; h++) {
+                if (hourCounts[h] !== undefined) hourCounts[h]++;
+            }
+        });
+    });
+
+    const labels = Object.keys(hourCounts).map(h => `${String(h).padStart(2, '0')}:00`);
+    const data = Object.values(hourCounts);
+
+    if (bookingsTimeChart) bookingsTimeChart.destroy();
+
+    bookingsTimeChart = new Chart(ctx.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Total Bookings',
+                data,
+                backgroundColor: m.color + '30',
+                borderColor: m.color,
+                borderWidth: 2,
+                borderRadius: 6,
+                borderSkipped: false,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: { label: ctx => `${ctx.raw} booking${ctx.raw !== 1 ? 's' : ''}` },
+                    backgroundColor: '#1e2130',
+                    titleColor: '#e2e4f0',
+                    bodyColor: '#9ba3b4',
+                    borderColor: 'rgba(255,255,255,.08)',
+                    borderWidth: 1,
+                    padding: 10,
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#9ca3af', font: { size: 11 } },
+                },
+                y: {
+                    grid: { color: 'rgba(0,0,0,.05)' },
+                    ticks: { color: '#9ca3af', font: { size: 11 }, stepSize: 1, precision: 0 },
+                    beginAtZero: true,
+                },
+            },
+        },
+    });
+}
+
 // ── Bookings table ──
-function renderBookingsTable() {
+async function renderBookingsTable() {
     if (!currentStadium) return;
-    const all = generateAllBookings(currentStadium.sports);
+    const all = await generateAllBookings(currentStadium.sports);
     const tbody = $('#bookings-table-body');
+    if (!tbody) return;
     tbody.innerHTML = '';
     all.forEach(b => {
         const m = SPORT_META[b.sport];
