@@ -1,5 +1,6 @@
 {
     "version": 2,
+    "framework": null,
     "buildCommand": "npm run build",
     "outputDirectory": "dist",
     "rewrites": [
@@ -10,6 +11,10 @@
         {
             "source": "/admin/(.*)",
             "destination": "/admin/$1"
+        },
+        {
+            "source": "/(.*\\.js|.*\\.css|.*\\.png|.*\\.svg)",
+            "destination": "/$1"
         },
         {
             "source": "/(.*)",
