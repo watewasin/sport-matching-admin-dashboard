@@ -123,74 +123,56 @@ const REVENUE_DATA = {
     },
 };
 
-// ── BACKEND INTEGRATION READY ──
-// This function simulates fetching bookings for a specific date and sport.
-// In the future, replace the setTimeout with:
-// return fetch(`/api/bookings?date=${date}&sport=${sport}`).then(res => res.json());
+// ── n8n Webhook Base URL ──
+// Replace this with your actual n8n instance URL
+const N8N_BASE_URL = 'https://YOUR-N8N-INSTANCE.app.n8n.cloud/webhook';
+
+// ── Webhook endpoints ──
+// Create these workflows in n8n and use these exact paths:
+//   GET  bookings  →  n8n Webhook path: /get-bookings
+//   POST booking   →  n8n Webhook path: /create-booking
+//   PATCH booking  →  n8n Webhook path: /update-booking
+
 async function fetchBookingsForDate(dateStr, sport) {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            // Mock database response for any date
-            const mockDb = {
-                football: [
-                    { time: '08:00 – 09:00', name: 'Santos FC', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1001' },
-                    { time: '10:00 – 12:00', name: 'FC Rangers', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-1002' },
-                    { time: '13:00 – 14:00', name: 'Walk-in Customer', court: 'Pitch B', courtId: 'Pitch B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-1003' },
-                    { time: '15:00 – 17:00', name: 'City United', court: 'Pitch C', courtId: 'Pitch C', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1004' },
-                ],
-                basketball: [
-                    { time: '09:00 – 11:00', name: 'Thunder Hawks', court: 'Court 1', courtId: 'Court 1', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-2001' },
-                    { time: '13:00 – 14:00', name: 'Urban Ballers', court: 'Court 2', courtId: 'Court 2', status: 'walk-in', currentStage: 'checked-in', source: 'walk-in', isPaid: false, id: 'BK-2002' },
-                    { time: '17:00 – 19:00', name: 'Weekend Warriors', court: 'Court 1', courtId: 'Court 1', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-2003' },
-                ],
-                swimming: [
-                    { time: '06:00 – 07:00', name: 'Morning Swim Club', court: 'Pool A', courtId: 'Pool A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-3001' },
-                    { time: '16:00 – 18:00', name: 'Swim Academy', court: 'Pool B', courtId: 'Pool B', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-3002' },
-                ],
-                tennis: [
-                    { time: '08:00 – 10:00', name: 'Alex Johnson', court: 'Court T1', courtId: 'Court T1', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-4001' },
-                    { time: '11:00 – 13:00', name: 'Doubles Pair', court: 'Court T2', courtId: 'Court T2', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-4002' },
-                    { time: '15:00 – 17:00', name: 'Tennis Tournament', court: 'Court T3', courtId: 'Court T3', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-4003' },
-                ],
-                badminton: [
-                    { time: '07:00 – 09:00', name: 'Badminton Club', court: 'Hall A', courtId: 'Hall A', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-5001' },
-                    { time: '12:00 – 13:00', name: 'Walk-in Pair', court: 'Hall B', courtId: 'Hall B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-5002' },
-                ]
-            };
-
-            // If the date is not today, maybe randomize it slightly or return empty to prove it's dynamic
-            const isToday = dateStr === new Date().toISOString().split('T')[0];
-            let data = mockDb[sport] || [];
-            if (!isToday && data.length > 0) {
-                // remove the first booking just to make the UI look different on other days for demo purposes
-                data = data.slice(1);
-            }
-            resolve(data);
-        }, 100); // simulate 100ms network delay
-    });
+    try {
+        const res = await fetch(
+            `${N8N_BASE_URL}/get-bookings?date=${dateStr}&sport=${sport}&stadiumId=${currentStadium?.id || ''}`,
+            { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json(); // n8n returns array of booking objects
+    } catch (err) {
+        console.warn('⚠ fetchBookingsForDate failed, using mock data:', err.message);
+        // ── FALLBACK: mock data so UI never breaks during development ──
+        const mockDb = {
+            football: [
+                { time: '08:00 – 09:00', name: 'Santos FC', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1001' },
+                { time: '10:00 – 12:00', name: 'FC Rangers', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-1002' },
+                { time: '13:00 – 14:00', name: 'Walk-in Customer', court: 'Pitch B', courtId: 'Pitch B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-1003' },
+                { time: '15:00 – 17:00', name: 'City United', court: 'Pitch C', courtId: 'Pitch C', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1004' },
+            ],
+            basketball: [
+                { time: '09:00 – 11:00', name: 'Thunder Hawks', court: 'Court 1', courtId: 'Court 1', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-2001' },
+                { time: '13:00 – 14:00', name: 'Urban Ballers', court: 'Court 2', courtId: 'Court 2', status: 'walk-in', currentStage: 'checked-in', source: 'walk-in', isPaid: false, id: 'BK-2002' },
+                { time: '17:00 – 19:00', name: 'Weekend Warriors', court: 'Court 1', courtId: 'Court 1', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-2003' },
+            ],
+            swimming: [
+                { time: '06:00 – 07:00', name: 'Morning Swim Club', court: 'Pool A', courtId: 'Pool A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-3001' },
+                { time: '16:00 – 18:00', name: 'Swim Academy', court: 'Pool B', courtId: 'Pool B', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-3002' },
+            ],
+            tennis: [
+                { time: '08:00 – 10:00', name: 'Alex Johnson', court: 'Court T1', courtId: 'Court T1', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-4001' },
+                { time: '11:00 – 13:00', name: 'Doubles Pair', court: 'Court T2', courtId: 'Court T2', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-4002' },
+                { time: '15:00 – 17:00', name: 'Tennis Tournament', court: 'Court T3', courtId: 'Court T3', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-4003' },
+            ],
+            badminton: [
+                { time: '07:00 – 09:00', name: 'Badminton Club', court: 'Hall A', courtId: 'Hall A', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-5001' },
+                { time: '12:00 – 13:00', name: 'Walk-in Pair', court: 'Hall B', courtId: 'Hall B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-5002' },
+            ],
+        };
+        return mockDb[sport] || [];
+    }
 }
-
-
-//replace this code with the above 
-/*async function fetchBookingsForDate(dateStr, sport) {
-    // 1. Import Firebase SDK at the top of your HTML
-    //    <script type="module" src="firebase-config.js"></script>
-
-    // 2. Replace the setTimeout mock with a real Firestore query:
-    const { getFirestore, collection, query, where, getDocs } = window.firestore;
-    const db = getFirestore();
-
-    const q = query(
-        collection(db, 'bookings'),
-        where('date', '==', dateStr),
-        where('sport', '==', sport),
-        where('stadiumId', '==', currentStadium.id)
-    );
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-*/
 
 // Full bookings list for table
 async function generateAllBookings(sports) {
@@ -1353,7 +1335,16 @@ function showActionPopover(e, b, court, sport) {
                 // Update local obj
                 b.currentStage = 'checked-in';
             }
-            console.log(`📤 SENDING PATCH TO BACKEND (${actionId}):`, JSON.stringify(patchPayload, null, 2));
+            // ── REAL n8n PATCH REQUEST ──
+            try {
+                fetch(`${N8N_BASE_URL}/update-booking`, {
+                    method: 'POST',   // n8n webhooks only support POST/GET; we use POST with an action field
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: b.id, ...patchPayload }),
+                });
+            } catch (err) {
+                console.warn('PATCH webhook failed:', err.message);
+            }
 
             // Toast wording based on destination state
             const toasts = {
@@ -1596,14 +1587,19 @@ function initWalkInModal() {
             date: selectedCalendarDate.toISOString().split('T')[0]
         };
 
-        // ── LOG JSON FOR BACKEND VERIFICATION ──
-        console.log("📤 SENDING TO BACKEND (JSON):", JSON.stringify(newBooking, null, 2));
+        // ── SEND TO n8n BACKEND ──
+        fetch(`${N8N_BASE_URL}/create-booking`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newBooking),
+        }).catch(err => console.warn('Walk-in POST failed:', err.message));
 
-        // ── Inject into TL_BOOKINGS so the timeline reflects it ──
+        // ── Also inject locally so timeline updates instantly (optimistic UI) ──
         if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
         if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
 
         TL_BOOKINGS[sport][court].push(newBooking);
+
 
         closeModal();
         showToast(`✅ Booked! ${SPORT_META[sport].icon} ${name} · ${court} · ${time}`);
