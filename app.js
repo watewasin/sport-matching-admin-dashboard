@@ -170,6 +170,28 @@ async function fetchBookingsForDate(dateStr, sport) {
     });
 }
 
+
+//replace this code with the above 
+/*async function fetchBookingsForDate(dateStr, sport) {
+    // 1. Import Firebase SDK at the top of your HTML
+    //    <script type="module" src="firebase-config.js"></script>
+
+    // 2. Replace the setTimeout mock with a real Firestore query:
+    const { getFirestore, collection, query, where, getDocs } = window.firestore;
+    const db = getFirestore();
+
+    const q = query(
+        collection(db, 'bookings'),
+        where('date', '==', dateStr),
+        where('sport', '==', sport),
+        where('stadiumId', '==', currentStadium.id)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+*/
+
 // Full bookings list for table
 async function generateAllBookings(sports) {
     const all = [];
