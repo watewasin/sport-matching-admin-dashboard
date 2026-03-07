@@ -123,55 +123,62 @@ const REVENUE_DATA = {
     },
 };
 
-// ── n8n Webhook Base URL ──
-// Replace this with your actual n8n instance URL
-const N8N_BASE_URL = 'https://YOUR-N8N-INSTANCE.app.n8n.cloud/webhook';
+// ══════════════════════════════════════════════════════
+// FIREBASE FIRESTORE — Helper to check if DB is ready
+// ══════════════════════════════════════════════════════
+function isFirebaseReady() {
+    return typeof window.db !== 'undefined';
+}
 
-// ── Webhook endpoints ──
-// Create these workflows in n8n and use these exact paths:
-//   GET  bookings  →  n8n Webhook path: /get-bookings
-//   POST booking   →  n8n Webhook path: /create-booking
-//   PATCH booking  →  n8n Webhook path: /update-booking
-
+// ── GET bookings for a specific date + sport ──
 async function fetchBookingsForDate(dateStr, sport) {
-    try {
-        const res = await fetch(
-            `${N8N_BASE_URL}/get-bookings?date=${dateStr}&sport=${sport}&stadiumId=${currentStadium?.id || ''}`,
-            { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json(); // n8n returns array of booking objects
-    } catch (err) {
-        console.warn('⚠ fetchBookingsForDate failed, using mock data:', err.message);
-        // ── FALLBACK: mock data so UI never breaks during development ──
-        const mockDb = {
-            football: [
-                { time: '08:00 – 09:00', name: 'Santos FC', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1001' },
-                { time: '10:00 – 12:00', name: 'FC Rangers', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-1002' },
-                { time: '13:00 – 14:00', name: 'Walk-in Customer', court: 'Pitch B', courtId: 'Pitch B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-1003' },
-                { time: '15:00 – 17:00', name: 'City United', court: 'Pitch C', courtId: 'Pitch C', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1004' },
-            ],
-            basketball: [
-                { time: '09:00 – 11:00', name: 'Thunder Hawks', court: 'Court 1', courtId: 'Court 1', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-2001' },
-                { time: '13:00 – 14:00', name: 'Urban Ballers', court: 'Court 2', courtId: 'Court 2', status: 'walk-in', currentStage: 'checked-in', source: 'walk-in', isPaid: false, id: 'BK-2002' },
-                { time: '17:00 – 19:00', name: 'Weekend Warriors', court: 'Court 1', courtId: 'Court 1', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-2003' },
-            ],
-            swimming: [
-                { time: '06:00 – 07:00', name: 'Morning Swim Club', court: 'Pool A', courtId: 'Pool A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-3001' },
-                { time: '16:00 – 18:00', name: 'Swim Academy', court: 'Pool B', courtId: 'Pool B', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-3002' },
-            ],
-            tennis: [
-                { time: '08:00 – 10:00', name: 'Alex Johnson', court: 'Court T1', courtId: 'Court T1', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-4001' },
-                { time: '11:00 – 13:00', name: 'Doubles Pair', court: 'Court T2', courtId: 'Court T2', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-4002' },
-                { time: '15:00 – 17:00', name: 'Tennis Tournament', court: 'Court T3', courtId: 'Court T3', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-4003' },
-            ],
-            badminton: [
-                { time: '07:00 – 09:00', name: 'Badminton Club', court: 'Hall A', courtId: 'Hall A', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-5001' },
-                { time: '12:00 – 13:00', name: 'Walk-in Pair', court: 'Hall B', courtId: 'Hall B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-5002' },
-            ],
-        };
-        return mockDb[sport] || [];
+    if (!isFirebaseReady()) {
+        console.warn('⚠ Firebase not configured yet — using mock data');
+        return getMockBookings(sport);
     }
+    try {
+        const snapshot = await window.db.collection('bookings')
+            .where('date', '==', dateStr)
+            .where('sport', '==', sport)
+            .where('stadiumId', '==', currentStadium?.id || '')
+            .get();
+
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err) {
+        console.warn('⚠ Firestore fetch failed — using mock data:', err.message);
+        return getMockBookings(sport);
+    }
+}
+
+// ── Mock fallback (used while Firebase is not yet wired up) ──
+function getMockBookings(sport) {
+    const mockDb = {
+        football: [
+            { time: '08:00 – 09:00', name: 'Santos FC', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1001' },
+            { time: '10:00 – 12:00', name: 'FC Rangers', court: 'Pitch A', courtId: 'Pitch A', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-1002' },
+            { time: '13:00 – 14:00', name: 'Walk-in Customer', court: 'Pitch B', courtId: 'Pitch B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-1003' },
+            { time: '15:00 – 17:00', name: 'City United', court: 'Pitch C', courtId: 'Pitch C', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-1004' },
+        ],
+        basketball: [
+            { time: '09:00 – 11:00', name: 'Thunder Hawks', court: 'Court 1', courtId: 'Court 1', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-2001' },
+            { time: '13:00 – 14:00', name: 'Urban Ballers', court: 'Court 2', courtId: 'Court 2', status: 'walk-in', currentStage: 'checked-in', source: 'walk-in', isPaid: false, id: 'BK-2002' },
+            { time: '17:00 – 19:00', name: 'Weekend Warriors', court: 'Court 1', courtId: 'Court 1', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-2003' },
+        ],
+        swimming: [
+            { time: '06:00 – 07:00', name: 'Morning Swim Club', court: 'Pool A', courtId: 'Pool A', status: 'confirmed', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-3001' },
+            { time: '16:00 – 18:00', name: 'Swim Academy', court: 'Pool B', courtId: 'Pool B', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: false, id: 'BK-3002' },
+        ],
+        tennis: [
+            { time: '08:00 – 10:00', name: 'Alex Johnson', court: 'Court T1', courtId: 'Court T1', status: 'confirmed', currentStage: 'checked-in', source: 'app', isPaid: true, id: 'BK-4001' },
+            { time: '11:00 – 13:00', name: 'Doubles Pair', court: 'Court T2', courtId: 'Court T2', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-4002' },
+            { time: '15:00 – 17:00', name: 'Tennis Tournament', court: 'Court T3', courtId: 'Court T3', status: 'reserved', currentStage: 'pending', source: 'app', isPaid: true, id: 'BK-4003' },
+        ],
+        badminton: [
+            { time: '07:00 – 09:00', name: 'Badminton Club', court: 'Hall A', courtId: 'Hall A', status: 'confirmed', currentStage: 'completed', source: 'app', isPaid: true, id: 'BK-5001' },
+            { time: '12:00 – 13:00', name: 'Walk-in Pair', court: 'Hall B', courtId: 'Hall B', status: 'walk-in', currentStage: 'pending', source: 'walk-in', isPaid: false, id: 'BK-5002' },
+        ],
+    };
+    return mockDb[sport] || [];
 }
 
 // Full bookings list for table
@@ -1335,15 +1342,11 @@ function showActionPopover(e, b, court, sport) {
                 // Update local obj
                 b.currentStage = 'checked-in';
             }
-            // ── REAL n8n PATCH REQUEST ──
-            try {
-                fetch(`${N8N_BASE_URL}/update-booking`, {
-                    method: 'POST',   // n8n webhooks only support POST/GET; we use POST with an action field
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: b.id, ...patchPayload }),
-                });
-            } catch (err) {
-                console.warn('PATCH webhook failed:', err.message);
+            // ── FIRESTORE: Update booking state ──
+            if (isFirebaseReady() && b.id) {
+                window.db.collection('bookings').doc(b.id)
+                    .update(patchPayload)
+                    .catch(err => console.warn('Firestore update failed:', err.message));
             }
 
             // Toast wording based on destination state
@@ -1587,12 +1590,11 @@ function initWalkInModal() {
             date: selectedCalendarDate.toISOString().split('T')[0]
         };
 
-        // ── SEND TO n8n BACKEND ──
-        fetch(`${N8N_BASE_URL}/create-booking`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newBooking),
-        }).catch(err => console.warn('Walk-in POST failed:', err.message));
+        // ── FIRESTORE: Save new booking ──
+        if (isFirebaseReady()) {
+            window.db.collection('bookings').add(newBooking)
+                .catch(err => console.warn('Firestore add failed:', err.message));
+        }
 
         // ── Also inject locally so timeline updates instantly (optimistic UI) ──
         if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
