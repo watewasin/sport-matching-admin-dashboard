@@ -78,57 +78,102 @@ const OCCUPANCY_DATA = {};
 const REVENUE_DATA = {};
 
 // ══════════════════════════════════════════════════════
-// FIREBASE FIRESTORE — Helper to check if DB is ready
+// FIREBASE DATA LAYER
 // ══════════════════════════════════════════════════════
 function isFirebaseReady() {
-    return typeof window.db !== 'undefined';
+    return !!window.db;
+}
+
+// Flat list to store all current listener data
+let bookingsListenerUnsubscribe = null;
+let currentLoadedDate = '';
+
+function listenToBookingsForDate(dateStr, stadiumId) {
+    if (!window.db) return;
+    if (bookingsListenerUnsubscribe) bookingsListenerUnsubscribe();
+
+    currentLoadedDate = dateStr;
+
+    // Reset TL_BOOKINGS
+    Object.keys(SPORT_META).forEach(sport => {
+        TL_BOOKINGS[sport] = {};
+        SPORT_META[sport].courts.forEach(court => {
+            TL_BOOKINGS[sport][court] = [];
+        });
+    });
+
+    bookingsListenerUnsubscribe = window.db.collection('bookings')
+        .where('stadiumId', '==', stadiumId)
+        .where('date', '==', dateStr)
+        .onSnapshot(snapshot => {
+            // Clear again before repopulating
+            Object.keys(SPORT_META).forEach(sport => {
+                TL_BOOKINGS[sport] = {};
+                SPORT_META[sport].courts.forEach(court => {
+                    TL_BOOKINGS[sport][court] = [];
+                });
+            });
+
+            // Keep track of which days have bookings
+            BOOKED_DAYS_SET.add(parseInt(dateStr.split('-')[2], 10));
+
+            snapshot.forEach(doc => {
+                const b = { ...doc.data(), id: doc.id };
+                const s = b.sport;
+                const c = b.court;
+                if (TL_BOOKINGS[s] && TL_BOOKINGS[s][c]) {
+                    TL_BOOKINGS[s][c].push(b);
+                }
+            });
+
+            // Trigger updates if we are actively viewing
+            if (activeView === 'overview') {
+                renderTimeline(activeSport);
+                renderStats(activeSport);
+                renderDayChips();
+            }
+            if (activeView === 'bookings') {
+                renderBookingsChart();
+            }
+            renderBookingsTable();
+        });
 }
 
 // ── GET bookings for a specific date + sport ──
 async function fetchBookingsForDate(dateStr, sport) {
-    if (!isFirebaseReady()) {
-        console.warn('⚠ Firebase not configured yet — using mock data');
-        return getMockBookings(sport);
-    }
+    if (!window.db) return [];
+
     try {
-        // Fetch only by stadiumId to bypass Firestore Composite Index requirements
+        const stadiumId = currentStadium ? currentStadium.id : 'STD-003';
         const snapshot = await window.db.collection('bookings')
-            .where('stadiumId', '==', currentStadium?.id || '')
+            .where('date', '==', dateStr)
+            .where('sport', '==', sport)
+            .where('stadiumId', '==', stadiumId)
             .get();
 
-        // Local JS filtering for date and sport
-        const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        return allDocs.filter(b => b.date === dateStr && b.sport === sport);
+        const bookings = [];
+        snapshot.forEach(doc => {
+            bookings.push({ ...doc.data(), id: doc.id });
+        });
+        return bookings;
     } catch (err) {
-        console.warn('⚠ Firestore fetch failed — using mock data:', err.message);
-        return getMockBookings(sport);
+        console.error('Error fetching bookings:', err);
+        return [];
     }
-}
-
-// ── Mock fallback (returns empty — Firestore is the real source now) ──
-function getMockBookings(sport) {
-    return []; // No demo data — connect Firebase to see real bookings
 }
 
 // Full bookings list for table
-// Full bookings list for table — fetches real data from Firestore
 async function generateAllBookings(sports) {
     const all = [];
-    const todayStr = new Date().toISOString().split('T')[0];
+    const localDateIso = new Date(selectedCalendarDate.getTime() - (selectedCalendarDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
     for (const sport of sports) {
-        const bookings = await fetchBookingsForDate(todayStr, sport);
+        const bookings = await fetchBookingsForDate(localDateIso, sport);
         bookings.forEach(b => {
             const m = SPORT_META[sport];
             const hours = b.endH && b.startH ? b.endH - b.startH : 1;
             all.push({
-                id: b.id,
-                name: b.name,
-                sport,
-                court: b.court || b.courtId,
-                date: 'Today',
-                time: b.time,
-                status: b.status,
+                ...b, // inherit all properties
                 amount: b.price !== undefined ? `฿${b.price.toLocaleString()}` : `฿${(m.ratePerHour * hours).toLocaleString()}`,
             });
         });
@@ -233,9 +278,49 @@ function initLogin() {
 }
 
 // ═══════════════════════════════════════════
-// DASHBOARD BOOTSTRAP
-// ═══════════════════════════════════════════
-function loadDashboard(stadium) {
+async function loadDashboard(stadium) {
+    // Initiate Realtime listener for today
+    const localDateIso = new Date(selectedCalendarDate.getTime() - (selectedCalendarDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    listenToBookingsForDate(localDateIso, stadium.id);
+
+    // Populate weekly revenue data for charts dynamically
+    if (window.db) {
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
+        const weekDates = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(startOfWeek);
+            d.setDate(startOfWeek.getDate() + i);
+            weekDates.push(new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0]);
+        }
+
+        for (const s of stadium.sports) {
+            if (!REVENUE_DATA[s]) REVENUE_DATA[s] = { week: [0, 0, 0, 0, 0, 0, 0], month: [0, 0, 0, 0] };
+            try {
+                const snapshot = await window.db.collection('bookings')
+                    .where('stadiumId', '==', stadium.id)
+                    .where('sport', '==', s)
+                    .where('date', 'in', weekDates)
+                    .get();
+
+                const dailyTotals = [0, 0, 0, 0, 0, 0, 0];
+                snapshot.forEach(doc => {
+                    const b = doc.data();
+                    if (b.isPaid || b.status === 'confirmed') {
+                        const dayIndex = weekDates.indexOf(b.date);
+                        if (dayIndex !== -1) {
+                            dailyTotals[dayIndex] += Number(b.price) || 0;
+                        }
+                    }
+                });
+                REVENUE_DATA[s].week = dailyTotals;
+            } catch (err) {
+                console.error("Failed to fetch revenue:", err);
+            }
+        }
+    }
+
     activeSport = stadium.sports[0];
     applySportTheme(activeSport);
 
@@ -730,11 +815,29 @@ const TL_START_HOUR = 8;   // 08:00
 const TL_END_HOUR = 21;  // 21:00
 const TL_HOURS = Array.from({ length: TL_END_HOUR - TL_START_HOUR + 1 }, (_, i) => TL_START_HOUR + i);
 
-// ── Timeline bookings: populated from Firestore on date selection ──
+// ── Timeline bookings: populated from mock data ──
 const TL_BOOKINGS = {};
 
-// Days with bookings — populated dynamically from Firestore
+// Days with bookings — populated dynamically from mock data
 const BOOKED_DAYS_SET = new Set();
+
+let _mockDataSeeded = false;
+
+function seedMockDataIfNeeded() {
+    if (_mockDataSeeded) return;
+    _mockDataSeeded = true;
+
+    // Initialize TL_BOOKINGS structure if empty
+    if (typeof SPORT_META !== 'undefined') {
+        Object.keys(SPORT_META).forEach(sport => {
+            if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
+            SPORT_META[sport].courts.forEach(court => {
+                if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
+            });
+        });
+    }
+}
+
 
 
 // Picker state: what year is displayed inside the picker
@@ -1164,23 +1267,19 @@ function showActionPopover(e, b, court, sport) {
             // Legacy local state
             bSetState(sport, court, b.startH, action.next);
 
-            // ── MOCK BACKEND PATCH REQUEST ──
-            let patchPayload = {};
+            const updateData = {};
             if (actionId === 'paid') {
-                patchPayload = { isPaid: true, currentStage: 'completed' };
-                // Update local obj
-                b.isPaid = true;
-                b.currentStage = 'completed';
+                updateData.isPaid = true;
+                updateData.currentStage = 'completed';
             } else if (actionId === 'checkin') {
-                patchPayload = { currentStage: 'checked-in' };
-                // Update local obj
-                b.currentStage = 'checked-in';
+                updateData.currentStage = 'checked-in';
             }
-            // ── FIRESTORE: Update booking state ──
-            if (isFirebaseReady() && b.id) {
-                window.db.collection('bookings').doc(b.id)
-                    .update(patchPayload)
-                    .catch(err => console.warn('Firestore update failed:', err.message));
+
+            if (b.id && window.db) {
+                window.db.collection('bookings').doc(b.id).update(updateData).catch(err => console.error(err));
+            } else {
+                b.isPaid = updateData.isPaid || b.isPaid;
+                b.currentStage = updateData.currentStage || b.currentStage;
             }
 
             // Toast wording based on destination state
@@ -1429,22 +1528,23 @@ function initWalkInModal() {
             date: localSelectedDate,
         };
 
-        // ── FIRESTORE: Save new booking ──
-        if (isFirebaseReady()) {
+        if (window.db) {
             try {
-                // Wait for the save so that the table refresh fetches it
-                await window.db.collection('bookings').add(newBooking);
+                // Remove id so Firestore auto-generates it
+                const docData = { ...newBooking };
+                delete docData.id;
+                await window.db.collection('bookings').add(docData);
             } catch (err) {
-                console.warn('Firestore add failed:', err.message);
+                console.error(err);
+                showToast('⚠ Failed to save booking to Firebase.');
+                return;
             }
+        } else {
+            // Local fallback
+            if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
+            if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
+            TL_BOOKINGS[sport][court].push(newBooking);
         }
-
-        // ── Also inject locally so timeline updates instantly (optimistic UI) ──
-        if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
-        if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
-
-        TL_BOOKINGS[sport][court].push(newBooking);
-
 
         closeModal();
         showToast(`✅ Booked! ${SPORT_META[sport].icon} ${name} · ${court} · ${time}`);

@@ -574,14 +574,14 @@ svg {
 }
 
 .sidebar-brand {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 800;
     color: #e2e4f0;
     letter-spacing: -0.3px;
 }
 
 .sidebar-stadium-name {
-    font-size: 0.72rem;
+    font-size: 0.9rem;
     color: var(--sidebar-text);
     font-weight: 500;
     white-space: nowrap;
@@ -609,7 +609,7 @@ svg {
 }
 
 .sidebar-section-label {
-    font-size: 0.65rem;
+    font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 1px;
     color: rgba(139, 144, 160, .55);
@@ -629,7 +629,7 @@ svg {
     padding: 0.6rem 0.75rem;
     border-radius: var(--radius-sm);
     color: var(--sidebar-text);
-    font-size: 0.875rem;
+    font-size: 1.05rem;
     font-weight: 500;
     margin-bottom: 2px;
     transition: color .2s, background .2s;
@@ -673,7 +673,7 @@ svg {
     padding: 0.55rem 0.75rem;
     border-radius: var(--radius-sm);
     color: var(--sidebar-text);
-    font-size: 0.875rem;
+    font-size: 1.05rem;
     font-weight: 500;
     margin-bottom: 2px;
     cursor: pointer;
@@ -754,7 +754,7 @@ svg {
 }
 
 .user-name {
-    font-size: 0.85rem;
+    font-size: 1.05rem;
     font-weight: 600;
     color: #e2e4f0;
     white-space: nowrap;
@@ -763,7 +763,7 @@ svg {
 }
 
 .user-role {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     color: var(--sidebar-text);
 }
 
@@ -1520,18 +1520,39 @@ svg {
 .cal-month-btn {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.75rem;
-    border-radius: 8px;
+    gap: 0.6rem;
+    padding: 0.5rem 1.1rem;
+    border-radius: 12px;
     background: var(--surface);
     border: 1.5px solid var(--border);
-    font-size: 0.875rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: var(--text-primary);
     font-family: inherit;
     cursor: pointer;
     transition: background .15s, border-color .15s;
     white-space: nowrap;
+}
+
+/* Today button styles (1.5x scale) */
+.cal-today-btn {
+    padding: 0.5rem 1.1rem;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    white-space: nowrap;
+}
+
+.cal-today-btn:hover {
+    background: var(--brand-50);
+    border-color: var(--brand-500);
+    color: var(--brand-600);
 }
 
 .cal-month-btn:hover,
@@ -1542,8 +1563,8 @@ svg {
 }
 
 .month-caret {
-    width: 14px;
-    height: 14px;
+    width: 21px;
+    height: 21px;
     transition: transform .2s;
     flex-shrink: 0;
 }
@@ -1916,55 +1937,69 @@ svg {
 
 /* PENDING — Light gray neutral (both App & Walk-in before check-in) */
 .tl-booking.state-pending {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-    color: #334155;
+    background: #e2e8f0;
+    /* darker gray bg */
+    border-color: #64748b;
+    /* darker border */
+    color: #0f172a;
+    /* near black text */
 }
 
 .tl-booking.state-pending .tl-booking-name,
 .tl-booking.state-pending .tl-booking-time {
-    color: #475569;
+    color: #1e293b;
+    /* darker text */
 }
 
 /* CHECKED-IN — Vibrant amber/yellow (Walk-in only: arrived, unpaid) */
 .tl-booking.state-checked-in {
-    background: #fefce8;
-    border-color: #eab308;
-    color: #713f12;
+    background: #fef08a;
+    /* more saturated yellow bg */
+    border-color: #ca8a04;
+    /* darker amber border */
+    color: #451a03;
+    /* darker brown text */
     border-width: 2px;
-    box-shadow: 0 0 0 2px rgba(234, 179, 8, .2), inset 0 0 0 1px rgba(234, 179, 8, .15);
+    box-shadow: 0 0 0 2px rgba(202, 138, 4, .3), inset 0 0 0 1px rgba(202, 138, 4, .2);
 }
 
 .tl-booking.state-checked-in .tl-booking-name {
-    color: #92400e;
+    color: #713f12;
+    /* darker brown name */
     font-weight: 800;
 }
 
 .tl-booking.state-checked-in .tl-booking-time {
-    color: #a16207;
+    color: #854d0e;
+    /* darker brown time */
 }
 
 /* COMPLETE — Solid green (both flows after final action) */
 .tl-booking.state-complete {
-    background: #f0fdf4;
-    border-color: #22c55e;
-    color: #15803d;
+    background: #dcfce7;
+    /* deeper green bg */
+    border-color: #16a34a;
+    /* deeper green border */
+    color: #052e16;
+    /* very dark green text */
 }
 
 .tl-booking.state-complete .tl-booking-name {
-    color: #166534;
+    color: #14532d;
+    /* very dark green name */
     font-weight: 800;
 }
 
 .tl-booking.state-complete .tl-booking-time {
-    color: #16a34a;
+    color: #166534;
+    /* darker green time */
 }
 
 /* Reserved — same light gray as pending (all un-actioned blocks start neutral) */
 .tl-booking.reserved {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-    color: #475569;
+    background: #e2e8f0;
+    border-color: #64748b;
+    color: #1e293b;
 }
 
 /* Source corner icon (phone = app, user-plus = walk-in) */
