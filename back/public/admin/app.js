@@ -78,97 +78,43 @@ const OCCUPANCY_DATA = {};
 const REVENUE_DATA = {};
 
 // ══════════════════════════════════════════════════════
-// FIREBASE DATA LAYER
+// MOCK DATA GENERATOR (Frontend-only version)
 // ══════════════════════════════════════════════════════
 function isFirebaseReady() {
-    return !!window.db;
-}
-
-// Flat list to store all current listener data
-let bookingsListenerUnsubscribe = null;
-let currentLoadedDate = '';
-
-function listenToBookingsForDate(dateStr, stadiumId) {
-    if (!window.db) return;
-    if (bookingsListenerUnsubscribe) bookingsListenerUnsubscribe();
-
-    currentLoadedDate = dateStr;
-
-    // Reset TL_BOOKINGS
-    Object.keys(SPORT_META).forEach(sport => {
-        TL_BOOKINGS[sport] = {};
-        SPORT_META[sport].courts.forEach(court => {
-            TL_BOOKINGS[sport][court] = [];
-        });
-    });
-
-    bookingsListenerUnsubscribe = window.db.collection('bookings')
-        .where('stadiumId', '==', stadiumId)
-        .where('date', '==', dateStr)
-        .onSnapshot(snapshot => {
-            // Clear again before repopulating
-            Object.keys(SPORT_META).forEach(sport => {
-                TL_BOOKINGS[sport] = {};
-                SPORT_META[sport].courts.forEach(court => {
-                    TL_BOOKINGS[sport][court] = [];
-                });
-            });
-
-            // Keep track of which days have bookings
-            BOOKED_DAYS_SET.add(parseInt(dateStr.split('-')[2], 10));
-
-            snapshot.forEach(doc => {
-                const b = { ...doc.data(), id: doc.id };
-                const s = b.sport;
-                const c = b.court;
-                if (TL_BOOKINGS[s] && TL_BOOKINGS[s][c]) {
-                    TL_BOOKINGS[s][c].push(b);
-                }
-            });
-
-            // Trigger updates if we are actively viewing
-            if (activeView === 'overview') {
-                renderTimeline(activeSport);
-                renderStats(activeSport);
-                renderDayChips();
-            }
-            if (activeView === 'bookings') {
-                renderBookingsChart();
-            }
-            renderBookingsTable();
-        });
+    return false; // Disabled for frontend version
 }
 
 // ── GET bookings for a specific date + sport ──
 async function fetchBookingsForDate(dateStr, sport) {
-    if (!window.db) return [];
-
-    try {
-        const stadiumId = currentStadium ? currentStadium.id : 'STD-003';
-        const snapshot = await window.db.collection('bookings')
-            .where('date', '==', dateStr)
-            .where('sport', '==', sport)
-            .where('stadiumId', '==', stadiumId)
-            .get();
-
-        const bookings = [];
-        snapshot.forEach(doc => {
-            bookings.push({ ...doc.data(), id: doc.id });
-        });
-        return bookings;
-    } catch (err) {
-        console.error('Error fetching bookings:', err);
-        return [];
-    }
+    return getMockBookings(sport, dateStr);
 }
 
-// Full bookings list for table
+// ── Mock fallback to generate initial booking examples ──
+function getMockBookings(sport, dateStr) {
+    seedMockDataIfNeeded();
+
+    // Find all mock bookings that match date and sport
+    const all = [];
+    if (TL_BOOKINGS[sport]) {
+        for (const court in TL_BOOKINGS[sport]) {
+            TL_BOOKINGS[sport][court].forEach(b => {
+                if (b.date === dateStr) {
+                    all.push(b);
+                }
+            });
+        }
+    }
+    return all;
+}
+
+// Full bookings list for table — fetches data from mock fallback
 async function generateAllBookings(sports) {
     const all = [];
-    const localDateIso = new Date(selectedCalendarDate.getTime() - (selectedCalendarDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    // Only fetch for "Today" to show in the table
+    const todayStr = new Date().toISOString().split('T')[0];
 
     for (const sport of sports) {
-        const bookings = await fetchBookingsForDate(localDateIso, sport);
+        const bookings = await fetchBookingsForDate(todayStr, sport);
         bookings.forEach(b => {
             const m = SPORT_META[sport];
             const hours = b.endH && b.startH ? b.endH - b.startH : 1;
@@ -278,49 +224,10 @@ function initLogin() {
 }
 
 // ═══════════════════════════════════════════
-async function loadDashboard(stadium) {
-    // Initiate Realtime listener for today
-    const localDateIso = new Date(selectedCalendarDate.getTime() - (selectedCalendarDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-    listenToBookingsForDate(localDateIso, stadium.id);
-
-    // Populate weekly revenue data for charts dynamically
-    if (window.db) {
-        const today = new Date();
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
-        const weekDates = [];
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(startOfWeek);
-            d.setDate(startOfWeek.getDate() + i);
-            weekDates.push(new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0]);
-        }
-
-        for (const s of stadium.sports) {
-            if (!REVENUE_DATA[s]) REVENUE_DATA[s] = { week: [0, 0, 0, 0, 0, 0, 0], month: [0, 0, 0, 0] };
-            try {
-                const snapshot = await window.db.collection('bookings')
-                    .where('stadiumId', '==', stadium.id)
-                    .where('sport', '==', s)
-                    .where('date', 'in', weekDates)
-                    .get();
-
-                const dailyTotals = [0, 0, 0, 0, 0, 0, 0];
-                snapshot.forEach(doc => {
-                    const b = doc.data();
-                    if (b.isPaid || b.status === 'confirmed') {
-                        const dayIndex = weekDates.indexOf(b.date);
-                        if (dayIndex !== -1) {
-                            dailyTotals[dayIndex] += Number(b.price) || 0;
-                        }
-                    }
-                });
-                REVENUE_DATA[s].week = dailyTotals;
-            } catch (err) {
-                console.error("Failed to fetch revenue:", err);
-            }
-        }
-    }
-
+// DASHBOARD BOOTSTRAP
+// ═══════════════════════════════════════════
+function loadDashboard(stadium) {
+    seedMockDataIfNeeded();
     activeSport = stadium.sports[0];
     applySportTheme(activeSport);
 
@@ -827,6 +734,8 @@ function seedMockDataIfNeeded() {
     if (_mockDataSeeded) return;
     _mockDataSeeded = true;
 
+    const todayStr = new Date().toISOString().split('T')[0];
+
     // Initialize TL_BOOKINGS structure if empty
     if (typeof SPORT_META !== 'undefined') {
         Object.keys(SPORT_META).forEach(sport => {
@@ -836,6 +745,58 @@ function seedMockDataIfNeeded() {
             });
         });
     }
+
+    // Add some random mock bookings for today
+    const mockBookings = [
+        // Football
+        { sport: 'football', court: 'Pitch A', startH: 16, endH: 18, name: 'Youth Academy', status: 'confirmed', source: 'app', currentStage: 'completed', price: 1600, isPaid: true },
+        { sport: 'football', court: 'Pitch A', startH: 18, endH: 20, name: 'John Doe', status: 'confirmed', source: 'app', currentStage: 'pending', price: 1600, isPaid: true },
+        { sport: 'football', court: 'Pitch B', startH: 19, endH: 21, name: 'FC Bangkok', status: 'confirmed', source: 'app', currentStage: 'completed', price: 1600, isPaid: true },
+        { sport: 'football', court: 'Pitch B', startH: 17, endH: 18, name: 'Local Kickers', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 800, isPaid: false },
+        { sport: 'football', court: 'Pitch C', startH: 18, endH: 20, name: 'Corporate Match', status: 'confirmed', source: 'app', currentStage: 'pending', price: 1600, isPaid: true },
+
+        // Basketball
+        { sport: 'basketball', court: 'Court 1', startH: 17, endH: 19, name: 'Hoop Dreams', status: 'walk-in', source: 'walk-in', currentStage: 'pending', price: 1400, isPaid: false },
+        { sport: 'basketball', court: 'Court 1', startH: 19, endH: 21, name: 'City League', status: 'confirmed', source: 'app', currentStage: 'pending', price: 1400, isPaid: true },
+        { sport: 'basketball', court: 'Court 2', startH: 18, endH: 20, name: 'Night Owls', status: 'walk-in', source: 'walk-in', currentStage: 'checked-in', price: 1400, isPaid: false },
+
+        // Badminton
+        { sport: 'badminton', court: 'Hall A', startH: 10, endH: 12, name: 'Morning Smashers', status: 'walk-in', source: 'walk-in', currentStage: 'checked-in', price: 700, isPaid: false },
+        { sport: 'badminton', court: 'Hall A', startH: 12, endH: 14, name: 'Lunch Smash', status: 'confirmed', source: 'app', currentStage: 'completed', price: 700, isPaid: true },
+        { sport: 'badminton', court: 'Hall A', startH: 14, endH: 15, name: 'Solo Drill', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 350, isPaid: false },
+        { sport: 'badminton', court: 'Hall A', startH: 17, endH: 19, name: 'Evening Crew', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
+
+        { sport: 'badminton', court: 'Hall B', startH: 9, endH: 11, name: 'Seniors Club', status: 'walk-in', source: 'walk-in', currentStage: 'completed', price: 700, isPaid: true },
+        { sport: 'badminton', court: 'Hall B', startH: 13, endH: 15, name: 'Office Team', status: 'walk-in', source: 'walk-in', currentStage: 'checked-in', price: 700, isPaid: false },
+        { sport: 'badminton', court: 'Hall B', startH: 15, endH: 17, name: 'Student Promo', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: false },
+        { sport: 'badminton', court: 'Hall B', startH: 18, endH: 20, name: 'Alice Wong', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
+
+        { sport: 'badminton', court: 'Hall C', startH: 8, endH: 10, name: 'Early Birds', status: 'walk-in', source: 'walk-in', currentStage: 'completed', price: 700, isPaid: true },
+        { sport: 'badminton', court: 'Hall C', startH: 12, endH: 13, name: 'Quick Drill', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 350, isPaid: false },
+        { sport: 'badminton', court: 'Hall C', startH: 14, endH: 16, name: 'Weekend Warriors', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
+        { sport: 'badminton', court: 'Hall C', startH: 19, endH: 21, name: 'Pro Training', status: 'confirmed', source: 'app', currentStage: 'completed', price: 700, isPaid: true },
+
+        { sport: 'badminton', court: 'Hall D', startH: 10, endH: 12, name: 'Corporate Event', status: 'confirmed', source: 'app', currentStage: 'checked-in', price: 700, isPaid: false },
+        { sport: 'badminton', court: 'Hall D', startH: 12, endH: 14, name: 'Family Booking', status: 'walk-in', source: 'walk-in', currentStage: 'pending', price: 700, isPaid: false },
+        { sport: 'badminton', court: 'Hall D', startH: 14, endH: 16, name: 'John Co.', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
+        { sport: 'badminton', court: 'Hall D', startH: 18, endH: 19, name: 'Quick Match', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 350, isPaid: false }
+    ];
+
+    mockBookings.forEach((mb, i) => {
+        if (!TL_BOOKINGS[mb.sport]) return;
+        const court = TL_BOOKINGS[mb.sport][mb.court] ? mb.court : SPORT_META[mb.sport].courts[0];
+        const newBooking = {
+            id: `BK-MOCK-${i}`,
+            date: todayStr,
+            time: `${String(mb.startH).padStart(2, '0')}:00 – ${String(mb.endH).padStart(2, '0')}:00`,
+            courtId: court,
+            stadiumId: 'STD-001',
+            ...mb
+        };
+        TL_BOOKINGS[mb.sport][court].push(newBooking);
+    });
+
+    BOOKED_DAYS_SET.add(new Date().getDate());
 }
 
 
@@ -1267,19 +1228,12 @@ function showActionPopover(e, b, court, sport) {
             // Legacy local state
             bSetState(sport, court, b.startH, action.next);
 
-            const updateData = {};
+            // ── Update local state (no backend) ──
             if (actionId === 'paid') {
-                updateData.isPaid = true;
-                updateData.currentStage = 'completed';
+                b.isPaid = true;
+                b.currentStage = 'completed';
             } else if (actionId === 'checkin') {
-                updateData.currentStage = 'checked-in';
-            }
-
-            if (b.id && window.db) {
-                window.db.collection('bookings').doc(b.id).update(updateData).catch(err => console.error(err));
-            } else {
-                b.isPaid = updateData.isPaid || b.isPaid;
-                b.currentStage = updateData.currentStage || b.currentStage;
+                b.currentStage = 'checked-in';
             }
 
             // Toast wording based on destination state
@@ -1528,23 +1482,15 @@ function initWalkInModal() {
             date: localSelectedDate,
         };
 
-        if (window.db) {
-            try {
-                // Remove id so Firestore auto-generates it
-                const docData = { ...newBooking };
-                delete docData.id;
-                await window.db.collection('bookings').add(docData);
-            } catch (err) {
-                console.error(err);
-                showToast('⚠ Failed to save booking to Firebase.');
-                return;
-            }
-        } else {
-            // Local fallback
-            if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
-            if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
-            TL_BOOKINGS[sport][court].push(newBooking);
-        }
+        // ── Local Save (Frontend only) ──
+        // (Booking will persist until page reload)
+
+        // ── Also inject locally so timeline updates instantly (optimistic UI) ──
+        if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
+        if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
+
+        TL_BOOKINGS[sport][court].push(newBooking);
+
 
         closeModal();
         showToast(`✅ Booked! ${SPORT_META[sport].icon} ${name} · ${court} · ${time}`);

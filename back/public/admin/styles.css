@@ -792,13 +792,11 @@ svg {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    width: calc(100% - var(--sidebar-w));
-    transition: margin-left 0.28s, width 0.28s;
+    transition: margin-left 0.28s;
 }
 
 .main-content.expanded {
     margin-left: 0;
-    width: 100%;
 }
 
 /* ── Topbar ── */
@@ -1141,9 +1139,6 @@ svg {
     display: none;
     padding: 1.5rem;
     animation: fadeIn .25s;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
 }
 
 .view.active {
@@ -1165,10 +1160,9 @@ svg {
 /* ── Stats Row ── */
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
     margin-bottom: 1.25rem;
-    width: 100%;
 }
 
 .stat-card {
@@ -1268,16 +1262,9 @@ svg {
 /* ── Dashboard Grid ── */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr minmax(300px, 360px);
+    grid-template-columns: 1fr 360px;
     gap: 1.25rem;
     margin-bottom: 1.25rem;
-    max-width: 100%;
-}
-
-@media (max-width: 1200px) {
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* ── Cards ── */
@@ -1499,7 +1486,7 @@ svg {
     flex-direction: column;
     /* Fill most of the viewport so the timeline gets maximum space */
     height: calc(100vh - 200px);
-    min-height: 480px;
+    min-height: 520px;
 }
 
 /* Toolbar row */
@@ -1809,8 +1796,7 @@ svg {
 }
 
 .timeline-inner {
-    min-width: 1100px;
-    /* Reduced from 1400px to avoid extreme overflow on smaller laptops */
+    min-width: 1400px;
     padding: 0;
 }
 
