@@ -1491,17 +1491,30 @@ function initWalkInModal() {
 
         // ── Format for Firebase as Requested ──
         const formatAMPM = (h) => (h % 12 || 12) + ":00 " + (h < 12 || h === 24 ? "AM" : "PM");
+
+        // Map "Court 1" back to the requested "court_1" format for Firestore
+        let firebaseCourtID = court;
+        if (court.toLowerCase().startsWith('court') || court.toLowerCase().startsWith('hall') || court.toLowerCase().startsWith('pitch') || court.toLowerCase().startsWith('pool')) {
+            const parts = court.split(' ');
+            if (parts.length > 1) {
+                firebaseCourtID = `court_${parts[1].toLowerCase()}`;
+            }
+        }
+
         const firestoreBooking = {
             start: formatAMPM(startH),
             end: formatAMPM(endH),
-            CourtID: court,
+            CourtID: firebaseCourtID,
             Status: "Join", // "Free" or "Join"
             Member: [name || "Walk-in User"]
         };
 
         if (window.db) {
             window.db.collection('bookings').add(firestoreBooking)
-                .then(docRef => console.log('Successfully saved to Collection bookings:', docRef.id))
+                .then(docRef => {
+                    console.log('Successfully saved to Collection bookings:', docRef.id);
+                    newBooking.id = docRef.id; // overwrite temporary ID with real Firebase ID
+                })
                 .catch(err => console.error('Error saving booking:', err));
         }
 
