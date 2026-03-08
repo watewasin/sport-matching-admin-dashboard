@@ -761,8 +761,9 @@ async function fetchFirestoreData() {
     try {
         const todayStr = new Date().toISOString().split('T')[0];
 
-        // Listen for real-time updates on the 'admin' collection
-        window.db.collection('admin').onSnapshot((snapshot) => {
+        // Listen for real-time updates on the specific 'admin' document
+        const adminId = currentStadium ? currentStadium.id : 'admin_1';
+        window.db.collection('admin').where('id', '==', adminId).onSnapshot((snapshot) => {
 
             // Re-initialize TL_BOOKINGS from scratch on every snapshot update
             if (typeof SPORT_META !== 'undefined') {
