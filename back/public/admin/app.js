@@ -81,7 +81,7 @@ const REVENUE_DATA = {};
 // MOCK DATA GENERATOR (Frontend-only version)
 // ══════════════════════════════════════════════════════
 function isFirebaseReady() {
-    return false; // Disabled for frontend version
+    return !!window.db; // Enabled to check if Firebase is configued
 }
 
 // ── GET bookings for a specific date + sport ──
@@ -1482,7 +1482,23 @@ function initWalkInModal() {
             date: localSelectedDate,
         };
 
-        // ── Local Save (Frontend only) ──
+        // ── Format for Firebase as Requested ──
+        const formatAMPM = (h) => (h % 12 || 12) + ":00 " + (h < 12 || h === 24 ? "AM" : "PM");
+        const firestoreBooking = {
+            start: formatAMPM(startH),
+            end: formatAMPM(endH),
+            CourtID: court,
+            Status: "Join", // "Free" or "Join"
+            Member: [name || "Walk-in User"]
+        };
+
+        if (window.db) {
+            window.db.collection('bookings').add(firestoreBooking)
+                .then(docRef => console.log('Successfully saved to Collection bookings:', docRef.id))
+                .catch(err => console.error('Error saving booking:', err));
+        }
+
+        // ── Local Save (Frontend only for immediate UI update) ──
         // (Booking will persist until page reload)
 
         // ── Also inject locally so timeline updates instantly (optimistic UI) ──
@@ -1596,6 +1612,45 @@ function logOut() {
     $('#login-error').style.display = 'none';
     showScreen('screen-login');
 }
+
+// ═══════════════════════════════════════════
+// FIREBASE HELPER (Requested Schema Generator)
+// ═══════════════════════════════════════════
+window.createRequestedFirebaseStructure = async function () {
+    if (!window.db) {
+        console.error("Firebase is not initialized.");
+        return;
+    }
+
+    try {
+        // Collection profiles: { Name: "Alex", Bookings: [], Buddies: [], Rating: 4.8 }
+        await window.db.collection('profiles').doc('profile_example').set({
+            Name: "Alex",
+            Bookings: [],
+            Buddies: [],
+            Rating: 4.8
+        });
+
+        // Collection courts: { location: "SportZone Arena", sporttype: "Badminton" }
+        await window.db.collection('courts').add({
+            location: "SportZone Arena",
+            sporttype: "Badminton"
+        });
+
+        // Collection bookings: { start: "6:00 PM", end: "8:00 PM", CourtID: "court_1", Status: "Free", Member: ["user_2"] }
+        await window.db.collection('bookings').add({
+            start: "6:00 PM",
+            end: "8:00 PM",
+            CourtID: "court_1",
+            Status: "Free",
+            Member: ["user_2"]
+        });
+
+        console.log("Successfully created requested schema in Firebase!");
+    } catch (error) {
+        console.error("Error creating schema:", error);
+    }
+};
 
 // ═══════════════════════════════════════════
 // INIT
