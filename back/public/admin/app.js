@@ -1513,31 +1513,13 @@ function initWalkInModal() {
             window.db.collection('bookings').add(firestoreBooking)
                 .then(docRef => {
                     console.log('Successfully saved to Collection bookings:', docRef.id);
-                    newBooking.id = docRef.id; // overwrite temporary ID with real Firebase ID
+                    // No local push needed - onSnapshot listener will catch the event and re-render the UI
                 })
                 .catch(err => console.error('Error saving booking:', err));
         }
 
-        // ── Local Save (Frontend only for immediate UI update) ──
-        // (Booking will persist until page reload)
-
-        // ── Also inject locally so timeline updates instantly (optimistic UI) ──
-        if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
-        if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
-
-        TL_BOOKINGS[sport][court].push(newBooking);
-
-
         closeModal();
         showToast(`✅ Booked! ${SPORT_META[sport].icon} ${name} · ${court} · ${time}`);
-
-        // Re-render the active view
-        if (activeView === 'overview' && sport === activeSport) {
-            renderTimeline(sport);
-        } else if (activeView === 'bookings') {
-            renderBookingsChart();
-            renderBookingsTable();
-        }
     });
 }
 
