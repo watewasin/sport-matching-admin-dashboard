@@ -159,58 +159,90 @@ function initLogin() {
     const errorEl = $('#login-error');
     const btnText = $('.btn-text', form);
     const btnSpinner = $('.btn-spinner', form);
-    const eyeToggle = $('#eye-toggle');
-    const pwInput = $('#password');
-    const eyeShow = $('#eye-icon-show');
-    const eyeHide = $('#eye-icon-hide');
 
-    // Eye toggle
-    eyeToggle.addEventListener('click', () => {
-        if (pwInput.type === 'password') {
-            pwInput.type = 'text';
-            eyeShow.style.display = 'none';
-            eyeHide.style.display = 'block';
-        } else {
-            pwInput.type = 'password';
-            eyeShow.style.display = 'block';
-            eyeHide.style.display = 'none';
-        }
-    });
-
-    // Demo badge fill
+    // Set demo ID
     $$('.badge').forEach(badge => {
         badge.addEventListener('click', () => {
             const id = badge.textContent.split('·')[0].trim();
             $('#stadium-id').value = id;
-            $('#password').value = 'admin123';
         });
     });
 
     // Submit
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         errorEl.style.display = 'none';
         const stadiumId = $('#stadium-id').value.trim().toUpperCase();
-        const password = $('#password').value;
 
         // Fake loading
         btnText.style.display = 'none';
         btnSpinner.style.display = 'flex';
         form.querySelector('button[type=submit]').disabled = true;
 
-        setTimeout(async () => {
-            const stadium = STADIUMS[stadiumId];
-            if (!stadium || stadium.password !== password) {
+        if (!window.db) {
+            console.error("Firebase not initialized");
+            errorEl.style.display = 'flex';
+            errorEl.querySelector('span').textContent = 'Database connection error.';
+            btnText.style.display = 'block';
+            btnSpinner.style.display = 'none';
+            form.querySelector('button[type=submit]').disabled = false;
+            return;
+        }
+
+        try {
+            // Find admin document by ID to parse its courts
+            const snapshot = await window.db.collection('admin').where('id', '==', stadiumId).get();
+
+            if (snapshot.empty) {
                 errorEl.style.display = 'flex';
                 btnText.style.display = 'block';
                 btnSpinner.style.display = 'none';
                 form.querySelector('button[type=submit]').disabled = false;
                 return;
             }
-            currentStadium = stadium;
-            await loadDashboard(stadium);
+
+            const adminData = snapshot.docs[0].data();
+            const bookingsArray = adminData.court || [];
+
+            // Determine active sports for this admin based on the unique CourtIDs they have bookings/settings for
+            const activeSports = new Set();
+            bookingsArray.forEach(b => {
+                let courtId = (b.CourtID || '').toLowerCase();
+                // Map court_X to its sport
+                for (const sport in SPORT_META) {
+                    SPORT_META[sport].courts.forEach(validCourt => {
+                        let compareValid = validCourt.toLowerCase();
+                        if (compareValid.startsWith('court ') && courtId.startsWith('court_')) {
+                            compareValid = `court_${compareValid.split(' ')[1]}`;
+                        }
+                        if (courtId === compareValid || courtId === validCourt.toLowerCase()) {
+                            activeSports.add(sport);
+                        }
+                    });
+                }
+            });
+
+            const parsedSports = Array.from(activeSports);
+
+            // Build dynamic stadium object
+            currentStadium = {
+                id: adminData.id,
+                name: adminData.name || 'Sport Complex',
+                // Fallback to badminton if no sports detected yet
+                sports: parsedSports.length > 0 ? parsedSports : ['badminton']
+            };
+
+            await loadDashboard(currentStadium);
             showScreen('screen-dashboard');
-        }, 900);
+
+        } catch (err) {
+            console.error("Login error:", err);
+            errorEl.style.display = 'flex';
+            errorEl.querySelector('span').textContent = 'An error occurred during login.';
+            btnText.style.display = 'block';
+            btnSpinner.style.display = 'none';
+            form.querySelector('button[type=submit]').disabled = false;
+        }
     });
 }
 
