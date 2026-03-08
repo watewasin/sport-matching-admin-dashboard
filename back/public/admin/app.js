@@ -1,5 +1,5 @@
 /* ================================================================
-   SportPlex Admin — App Logic
+   SportTee Admin — App Logic
    ================================================================ */
 
 'use strict';
@@ -227,7 +227,7 @@ async function loadDashboard(stadium) {
     $('#sidebar-user-name').textContent = stadium.id;
     $('#sidebar-avatar').textContent = stadium.name[0];
     $('#topbar-stadium-label').textContent = stadium.id + ' · ' + stadium.name;
-    document.title = `${stadium.name} — SportPlex Admin`;
+    document.title = `${stadium.name} — SportTee Admin`;
 
     // Topbar date
     const dateEl = $('#topbar-date');
