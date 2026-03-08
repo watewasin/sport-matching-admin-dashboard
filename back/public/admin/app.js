@@ -727,82 +727,100 @@ async function fetchFirestoreData() {
     _dbDataSeeded = true;
 
     try {
-        const snapshot = await window.db.collection('bookings').get();
         const todayStr = new Date().toISOString().split('T')[0];
 
-        // Initialize TL_BOOKINGS
-        if (typeof SPORT_META !== 'undefined') {
-            Object.keys(SPORT_META).forEach(sport => {
-                if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
-                SPORT_META[sport].courts.forEach(court => {
+        // Listen for real-time updates on the 'admin' collection
+        window.db.collection('admin').onSnapshot((snapshot) => {
+
+            // Re-initialize TL_BOOKINGS from scratch on every snapshot update
+            if (typeof SPORT_META !== 'undefined') {
+                Object.keys(SPORT_META).forEach(sport => {
+                    TL_BOOKINGS[sport] = {};
+                    SPORT_META[sport].courts.forEach(court => {
+                        TL_BOOKINGS[sport][court] = [];
+                    });
+                });
+            }
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+
+                // Expecting a "court" array on the admin document
+                const courtsArray = data.court || [];
+
+                courtsArray.forEach((bookingData, idx) => {
+                    const parseTime = (t) => {
+                        if (!t) return 8;
+                        const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                        if (!match) return 8;
+                        let h = parseInt(match[1]);
+                        let isPM = match[3].toUpperCase() === 'PM';
+                        if (isPM && h !== 12) h += 12;
+                        if (!isPM && h === 12) h = 0;
+                        return h;
+                    };
+
+                    const startH = parseTime(bookingData.start);
+                    const endH = parseTime(bookingData.end);
+                    let court = bookingData.CourtID || 'Unknown';
+
+                    // Map "court_1" requested schema format to UI "Court 1" format safely
+                    if (court.toLowerCase().startsWith('court_')) {
+                        const num = court.split('_')[1];
+                        court = `Court ${num}`;
+                    }
+
+                    const name = (bookingData.Member && bookingData.Member.length > 0) ? bookingData.Member[0] : 'Unknown user';
+                    const statusStr = bookingData.Status || 'Free';
+
+                    let sport = 'badminton';
+                    for (const sp in SPORT_META) {
+                        if (SPORT_META[sp].courts.includes(court)) {
+                            sport = sp;
+                            break;
+                        }
+                    }
+
+                    let status = statusStr === 'Join' ? 'walk-in' : 'confirmed';
+                    let stage = statusStr === 'Join' ? 'completed' : 'pending';
+
+                    if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
                     if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
+
+                    TL_BOOKINGS[sport][court].push({
+                        id: doc.id + '_' + idx, // Generate pseudo id based on array index
+                        date: todayStr, // Assume today for the timeline
+                        time: `${String(startH).padStart(2, '0')}:00 – ${String(endH).padStart(2, '0')}:00`,
+                        courtId: court,
+                        stadiumId: data.id || 'STD-ADMIN',
+                        sport: sport,
+                        court: court,
+                        startH: startH,
+                        endH: endH,
+                        name: name,
+                        status: status,
+                        source: 'app',
+                        currentStage: stage,
+                        price: (endH - startH) * (SPORT_META[sport].ratePerHour || 600),
+                        isPaid: statusStr === 'Join'
+                    });
                 });
             });
-        }
 
-        snapshot.forEach(doc => {
-            const data = doc.data();
+            BOOKED_DAYS_SET.add(new Date().getDate());
 
-            const parseTime = (t) => {
-                if (!t) return 8;
-                const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                if (!match) return 8;
-                let h = parseInt(match[1]);
-                let isPM = match[3].toUpperCase() === 'PM';
-                if (isPM && h !== 12) h += 12;
-                if (!isPM && h === 12) h = 0;
-                return h;
-            };
-
-            const startH = parseTime(data.start);
-            const endH = parseTime(data.end);
-            let court = data.CourtID || 'Unknown';
-
-            // Map "court_1" requested schema format to UI "Court 1" format safely
-            if (court.toLowerCase().startsWith('court_')) {
-                const num = court.split('_')[1];
-                court = `Court ${num}`;
+            // ── TRIGGER UI UPDATE ──
+            if (activeView === 'overview' && activeSport) {
+                renderTimeline(activeSport);
+                renderStats(activeSport);
+            } else if (activeView === 'bookings') {
+                renderBookingsChart();
+                renderBookingsTable();
             }
-
-            const name = (data.Member && data.Member.length > 0) ? data.Member[0] : 'Unknown user';
-            const statusStr = data.Status || 'Free';
-
-            let sport = 'badminton';
-            for (const sp in SPORT_META) {
-                if (SPORT_META[sp].courts.includes(court)) {
-                    sport = sp;
-                    break;
-                }
-            }
-
-            let status = statusStr === 'Join' ? 'walk-in' : 'confirmed';
-            let stage = statusStr === 'Join' ? 'completed' : 'pending';
-
-            if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
-            if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
-
-            TL_BOOKINGS[sport][court].push({
-                id: doc.id,
-                date: todayStr, // Assume today for the timeline
-                time: `${String(startH).padStart(2, '0')}:00 – ${String(endH).padStart(2, '0')}:00`,
-                courtId: court,
-                stadiumId: 'STD-001',
-                sport: sport,
-                court: court,
-                startH: startH,
-                endH: endH,
-                name: name,
-                status: status,
-                source: 'app',
-                currentStage: stage,
-                price: (endH - startH) * (SPORT_META[sport].ratePerHour || 600),
-                isPaid: statusStr === 'Join'
-            });
         });
 
-        BOOKED_DAYS_SET.add(new Date().getDate());
     } catch (err) {
-        console.error("Error fetching data from Firebase:", err);
+        console.error("Error setting up Firebase listener:", err);
     }
 }
 
@@ -1510,12 +1528,23 @@ function initWalkInModal() {
         };
 
         if (window.db) {
-            window.db.collection('bookings').add(firestoreBooking)
-                .then(docRef => {
-                    console.log('Successfully saved to Collection bookings:', docRef.id);
-                    // No local push needed - onSnapshot listener will catch the event and re-render the UI
-                })
-                .catch(err => console.error('Error saving booking:', err));
+            // Find an admin document to append this booking to its `court` array
+            window.db.collection('admin').limit(1).get().then(snapshot => {
+                if (!snapshot.empty) {
+                    const docId = snapshot.docs[0].id;
+                    window.db.collection('admin').doc(docId).update({
+                        court: window.firebase.firestore.FieldValue.arrayUnion(firestoreBooking)
+                    })
+                        .then(() => console.log('Successfully added to admin court array'))
+                        .catch(err => console.error('Error adding booking to admin:', err));
+                } else {
+                    // Create an initial admin document if it doesn't exist
+                    window.db.collection('admin').add({
+                        id: currentStadium ? currentStadium.id : "admin_1",
+                        court: [firestoreBooking]
+                    });
+                }
+            });
         }
 
         closeModal();
