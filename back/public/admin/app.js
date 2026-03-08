@@ -78,7 +78,7 @@ const OCCUPANCY_DATA = {};
 const REVENUE_DATA = {};
 
 // ══════════════════════════════════════════════════════
-// MOCK DATA GENERATOR (Frontend-only version)
+// DATA FETCHING (Firestore)
 // ══════════════════════════════════════════════════════
 function isFirebaseReady() {
     return !!window.db; // Enabled to check if Firebase is configued
@@ -86,14 +86,6 @@ function isFirebaseReady() {
 
 // ── GET bookings for a specific date + sport ──
 async function fetchBookingsForDate(dateStr, sport) {
-    return getMockBookings(sport, dateStr);
-}
-
-// ── Mock fallback to generate initial booking examples ──
-function getMockBookings(sport, dateStr) {
-    seedMockDataIfNeeded();
-
-    // Find all mock bookings that match date and sport
     const all = [];
     if (TL_BOOKINGS[sport]) {
         for (const court in TL_BOOKINGS[sport]) {
@@ -107,10 +99,9 @@ function getMockBookings(sport, dateStr) {
     return all;
 }
 
-// Full bookings list for table — fetches data from mock fallback
+// Full bookings list for table
 async function generateAllBookings(sports) {
     const all = [];
-    // Only fetch for "Today" to show in the table
     const todayStr = new Date().toISOString().split('T')[0];
 
     for (const sport of sports) {
@@ -207,7 +198,7 @@ function initLogin() {
         btnSpinner.style.display = 'flex';
         form.querySelector('button[type=submit]').disabled = true;
 
-        setTimeout(() => {
+        setTimeout(async () => {
             const stadium = STADIUMS[stadiumId];
             if (!stadium || stadium.password !== password) {
                 errorEl.style.display = 'flex';
@@ -217,7 +208,7 @@ function initLogin() {
                 return;
             }
             currentStadium = stadium;
-            loadDashboard(stadium);
+            await loadDashboard(stadium);
             showScreen('screen-dashboard');
         }, 900);
     });
@@ -226,8 +217,8 @@ function initLogin() {
 // ═══════════════════════════════════════════
 // DASHBOARD BOOTSTRAP
 // ═══════════════════════════════════════════
-function loadDashboard(stadium) {
-    seedMockDataIfNeeded();
+async function loadDashboard(stadium) {
+    await fetchFirestoreData();
     activeSport = stadium.sports[0];
     applySportTheme(activeSport);
 
@@ -728,75 +719,91 @@ const TL_BOOKINGS = {};
 // Days with bookings — populated dynamically from mock data
 const BOOKED_DAYS_SET = new Set();
 
-let _mockDataSeeded = false;
+let _dbDataSeeded = false;
 
-function seedMockDataIfNeeded() {
-    if (_mockDataSeeded) return;
-    _mockDataSeeded = true;
+async function fetchFirestoreData() {
+    if (_dbDataSeeded) return;
+    if (!window.db) return;
+    _dbDataSeeded = true;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    try {
+        const snapshot = await window.db.collection('bookings').get();
+        const todayStr = new Date().toISOString().split('T')[0];
 
-    // Initialize TL_BOOKINGS structure if empty
-    if (typeof SPORT_META !== 'undefined') {
-        Object.keys(SPORT_META).forEach(sport => {
+        // Initialize TL_BOOKINGS
+        if (typeof SPORT_META !== 'undefined') {
+            Object.keys(SPORT_META).forEach(sport => {
+                if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
+                SPORT_META[sport].courts.forEach(court => {
+                    if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
+                });
+            });
+        }
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+
+            const parseTime = (t) => {
+                if (!t) return 8;
+                const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if (!match) return 8;
+                let h = parseInt(match[1]);
+                let isPM = match[3].toUpperCase() === 'PM';
+                if (isPM && h !== 12) h += 12;
+                if (!isPM && h === 12) h = 0;
+                return h;
+            };
+
+            const startH = parseTime(data.start);
+            const endH = parseTime(data.end);
+            let court = data.CourtID || 'Unknown';
+
+            // Map "court_1" requested schema format to UI "Court 1" format safely
+            if (court.toLowerCase().startsWith('court_')) {
+                const num = court.split('_')[1];
+                court = `Court ${num}`;
+            }
+
+            const name = (data.Member && data.Member.length > 0) ? data.Member[0] : 'Unknown user';
+            const statusStr = data.Status || 'Free';
+
+            let sport = 'badminton';
+            for (const sp in SPORT_META) {
+                if (SPORT_META[sp].courts.includes(court)) {
+                    sport = sp;
+                    break;
+                }
+            }
+
+            let status = statusStr === 'Join' ? 'walk-in' : 'confirmed';
+            let stage = statusStr === 'Join' ? 'completed' : 'pending';
+
             if (!TL_BOOKINGS[sport]) TL_BOOKINGS[sport] = {};
-            SPORT_META[sport].courts.forEach(court => {
-                if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
+            if (!TL_BOOKINGS[sport][court]) TL_BOOKINGS[sport][court] = [];
+
+            TL_BOOKINGS[sport][court].push({
+                id: doc.id,
+                date: todayStr, // Assume today for the timeline
+                time: `${String(startH).padStart(2, '0')}:00 – ${String(endH).padStart(2, '0')}:00`,
+                courtId: court,
+                stadiumId: 'STD-001',
+                sport: sport,
+                court: court,
+                startH: startH,
+                endH: endH,
+                name: name,
+                status: status,
+                source: 'app',
+                currentStage: stage,
+                price: (endH - startH) * (SPORT_META[sport].ratePerHour || 600),
+                isPaid: statusStr === 'Join'
             });
         });
+
+        BOOKED_DAYS_SET.add(new Date().getDate());
+    } catch (err) {
+        console.error("Error fetching data from Firebase:", err);
     }
-
-    // Add some random mock bookings for today
-    const mockBookings = [
-        // Football
-        { sport: 'football', court: 'Pitch A', startH: 16, endH: 18, name: 'Youth Academy', status: 'confirmed', source: 'app', currentStage: 'completed', price: 1600, isPaid: true },
-        { sport: 'football', court: 'Pitch A', startH: 18, endH: 20, name: 'John Doe', status: 'confirmed', source: 'app', currentStage: 'pending', price: 1600, isPaid: true },
-        { sport: 'football', court: 'Pitch B', startH: 19, endH: 21, name: 'FC Bangkok', status: 'confirmed', source: 'app', currentStage: 'completed', price: 1600, isPaid: true },
-        { sport: 'football', court: 'Pitch B', startH: 17, endH: 18, name: 'Local Kickers', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 800, isPaid: false },
-        { sport: 'football', court: 'Pitch C', startH: 18, endH: 20, name: 'Corporate Match', status: 'confirmed', source: 'app', currentStage: 'pending', price: 1600, isPaid: true },
-
-        // Basketball
-        { sport: 'basketball', court: 'Court 1', startH: 17, endH: 19, name: 'Hoop Dreams', status: 'walk-in', source: 'walk-in', currentStage: 'pending', price: 1400, isPaid: false },
-        { sport: 'basketball', court: 'Court 1', startH: 19, endH: 21, name: 'City League', status: 'confirmed', source: 'app', currentStage: 'pending', price: 1400, isPaid: true },
-        { sport: 'basketball', court: 'Court 2', startH: 18, endH: 20, name: 'Night Owls', status: 'walk-in', source: 'walk-in', currentStage: 'checked-in', price: 1400, isPaid: false },
-
-        // Badminton
-        { sport: 'badminton', court: 'Hall A', startH: 10, endH: 12, name: 'Morning Smashers', status: 'walk-in', source: 'walk-in', currentStage: 'checked-in', price: 700, isPaid: false },
-        { sport: 'badminton', court: 'Hall A', startH: 12, endH: 14, name: 'Lunch Smash', status: 'confirmed', source: 'app', currentStage: 'completed', price: 700, isPaid: true },
-        { sport: 'badminton', court: 'Hall A', startH: 14, endH: 15, name: 'Solo Drill', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 350, isPaid: false },
-        { sport: 'badminton', court: 'Hall A', startH: 17, endH: 19, name: 'Evening Crew', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
-
-        { sport: 'badminton', court: 'Hall B', startH: 9, endH: 11, name: 'Seniors Club', status: 'walk-in', source: 'walk-in', currentStage: 'completed', price: 700, isPaid: true },
-        { sport: 'badminton', court: 'Hall B', startH: 13, endH: 15, name: 'Office Team', status: 'walk-in', source: 'walk-in', currentStage: 'checked-in', price: 700, isPaid: false },
-        { sport: 'badminton', court: 'Hall B', startH: 15, endH: 17, name: 'Student Promo', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: false },
-        { sport: 'badminton', court: 'Hall B', startH: 18, endH: 20, name: 'Alice Wong', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
-
-        { sport: 'badminton', court: 'Hall C', startH: 8, endH: 10, name: 'Early Birds', status: 'walk-in', source: 'walk-in', currentStage: 'completed', price: 700, isPaid: true },
-        { sport: 'badminton', court: 'Hall C', startH: 12, endH: 13, name: 'Quick Drill', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 350, isPaid: false },
-        { sport: 'badminton', court: 'Hall C', startH: 14, endH: 16, name: 'Weekend Warriors', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
-        { sport: 'badminton', court: 'Hall C', startH: 19, endH: 21, name: 'Pro Training', status: 'confirmed', source: 'app', currentStage: 'completed', price: 700, isPaid: true },
-
-        { sport: 'badminton', court: 'Hall D', startH: 10, endH: 12, name: 'Corporate Event', status: 'confirmed', source: 'app', currentStage: 'checked-in', price: 700, isPaid: false },
-        { sport: 'badminton', court: 'Hall D', startH: 12, endH: 14, name: 'Family Booking', status: 'walk-in', source: 'walk-in', currentStage: 'pending', price: 700, isPaid: false },
-        { sport: 'badminton', court: 'Hall D', startH: 14, endH: 16, name: 'John Co.', status: 'confirmed', source: 'app', currentStage: 'pending', price: 700, isPaid: true },
-        { sport: 'badminton', court: 'Hall D', startH: 18, endH: 19, name: 'Quick Match', status: 'walk-in', source: 'walk-in', currentStage: 'unpaid', price: 350, isPaid: false }
-    ];
-
-    mockBookings.forEach((mb, i) => {
-        if (!TL_BOOKINGS[mb.sport]) return;
-        const court = TL_BOOKINGS[mb.sport][mb.court] ? mb.court : SPORT_META[mb.sport].courts[0];
-        const newBooking = {
-            id: `BK-MOCK-${i}`,
-            date: todayStr,
-            time: `${String(mb.startH).padStart(2, '0')}:00 – ${String(mb.endH).padStart(2, '0')}:00`,
-            courtId: court,
-            stadiumId: 'STD-001',
-            ...mb
-        };
-        TL_BOOKINGS[mb.sport][court].push(newBooking);
-    });
-
-    BOOKED_DAYS_SET.add(new Date().getDate());
 }
 
 
