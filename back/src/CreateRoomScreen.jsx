@@ -23,7 +23,7 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
         const courtsSnap = await getDocs(collection(db, 'courts'));
         const courtData = courtsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setAllCourts(courtData);
-
+        
         // Auto-select the first Badminton court by default
         const initialCourts = courtData.filter(c => c.sporttype === 'Badminton');
         if (initialCourts.length > 0) setSelectedCourt(initialCourts[0].id);
@@ -46,68 +46,19 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
   const handleCreateRoom = async (e) => {
     e.preventDefault();
     if (!selectedCourt) return alert("Please select a valid court location first!");
-
+    
     setLoading(true);
     try {
       const tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
 
-      // ── Parse 12-hour AM/PM times to 24-hour integers (e.g. "6:00 PM" -> 18) ──
-      const parseTime = (timeStr) => {
-        const [time, period] = timeStr.trim().split(' ');
-        let [hours, minutes] = time.split(':').map(Number);
-        if (period && period.toLowerCase() === 'pm' && hours !== 12) hours += 12;
-        if (period && period.toLowerCase() === 'am' && hours === 12) hours = 0;
-        return hours;
-      };
-
-      const start24 = parseTime(startTime);
-      const end24 = parseTime(endTime);
-
-      // Find the actual court name for display in the dashboard
-      const selectedCourtObj = allCourts.find(c => c.id === selectedCourt);
-      const courtName = selectedCourtObj ? selectedCourtObj.location : selectedCourt;
-
-      // Rate lookup (matching Dashboard SPORT_META)
-      const sportRates = { 'badminton': 350, 'football': 1200, 'tennis': 700, 'basketball': 800, 'swimming': 500 };
-      const ratePerHour = sportRates[selectedSport.toLowerCase()] || 600;
-
-      // Calculate local timezone date (solves the UTC previous-day bug)
-      const today = new Date();
-      const localDateIso = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-
-      // Map sport to exact Stadium ID (matching Admin Dashboard config)
-      const sportToStadiumMap = {
-        'badminton': 'STD-001',
-        'football': 'STD-002',
-        'basketball': 'STD-002',
-        'tennis': 'STD-003',
-        'swimming': 'STD-003'
-      };
-      const mappedStadiumId = sportToStadiumMap[selectedSport.toLowerCase()] || 'STD-003';
-
       const newBooking = {
-        // App-specific fields
+        CourtID: selectedCourt,
+        start: startTime,
+        end: endTime,
         Level: level,
         Tags: tagsArray,
-        Status: "Join", // App UI status
-        Member: [user.id],
-
-        // Unified Dashboard Schema Fields
-        sport: selectedSport.toLowerCase(),
-        court: courtName,
-        courtId: selectedCourt,
-        time: `${String(start24).padStart(2, '0')}:00 – ${String(end24).padStart(2, '0')}:00`,
-        startH: start24,
-        endH: end24,
-        name: user.name || 'App User', // assuming user has a name field
-        phone: user.phone || '—',
-        status: 'reserved',            // App bookings are assumed reserved
-        source: 'app',
-        currentStage: 'pending',
-        stadiumId: mappedStadiumId,
-        price: (end24 - start24) * ratePerHour,
-        isPaid: false,
-        date: localDateIso
+        Status: "Join", // Let's use "Join" for open rooms based on your UI mockup
+        Member: [user.id] 
       };
 
       const docRef = await addDoc(collection(db, 'bookings'), newBooking);
@@ -127,7 +78,7 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
     <div className="bg-[#f8fafc] min-h-full pb-20">
       <div className="bg-[#1a233a] rounded-b-3xl px-6 pt-12 pb-8 text-white">
         <div className="flex items-center gap-4">
-          <button onClick={() => setCurrentScreen('home')} className="bg-white/10 p-2 rounded-full"><ChevronLeft size={20} /></button>
+          <button onClick={() => setCurrentScreen('home')} className="bg-white/10 p-2 rounded-full"><ChevronLeft size={20}/></button>
           <h1 className="text-xl font-bold">Create a Room</h1>
         </div>
       </div>
@@ -135,14 +86,14 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
       <div className="px-6 mt-8">
         {fetchingCourts ? <Loader2 className="animate-spin mx-auto text-gray-400" /> : (
           <form onSubmit={handleCreateRoom} className="space-y-5">
-
+            
             {/* NEW: Sport Selection Tabs */}
             <div className="space-y-3">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Activity size={16} className="text-blue-500" /> Select Sport</label>
+              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Activity size={16} className="text-blue-500"/> Select Sport</label>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                {['Badminton', 'Football', 'Basketball', 'Tennis', 'Swimming'].map(sport => (
-                  <button
-                    key={sport}
+                {['Badminton', 'Football', 'Tennis', 'Running'].map(sport => (
+                  <button 
+                    key={sport} 
                     type="button"
                     onClick={() => handleSportChange(sport)}
                     className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${selectedSport === sport ? 'bg-[#22c55e] text-white shadow-md' : 'bg-white border text-gray-600 shadow-sm'}`}
@@ -155,10 +106,10 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
 
             {/* Filtered Court Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><MapPin size={16} className="text-[#22c55e]" /> Court Location</label>
-              <select
-                value={selectedCourt}
-                onChange={(e) => setSelectedCourt(e.target.value)}
+              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><MapPin size={16} className="text-[#22c55e]"/> Court Location</label>
+              <select 
+                value={selectedCourt} 
+                onChange={(e) => setSelectedCourt(e.target.value)} 
                 className="w-full p-4 rounded-2xl bg-white border outline-none shadow-sm text-slate-700 font-medium appearance-none"
                 disabled={filteredCourts.length === 0}
               >
@@ -172,17 +123,17 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
 
             <div className="flex gap-4">
               <div className="space-y-2 flex-1">
-                <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Clock size={16} className="text-orange-400" /> Start Time</label>
+                <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Clock size={16} className="text-orange-400"/> Start Time</label>
                 <input type="text" placeholder="e.g. 6:00 PM" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full p-4 rounded-2xl bg-white border outline-none shadow-sm text-slate-700" required />
               </div>
               <div className="space-y-2 flex-1">
-                <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Clock size={16} className="text-orange-400" /> End Time</label>
+                <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Clock size={16} className="text-orange-400"/> End Time</label>
                 <input type="text" placeholder="e.g. 8:00 PM" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full p-4 rounded-2xl bg-white border outline-none shadow-sm text-slate-700" required />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Target size={16} className="text-blue-500" /> Skill Level</label>
+              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Target size={16} className="text-blue-500"/> Skill Level</label>
               <select value={level} onChange={(e) => setLevel(e.target.value)} className="w-full p-4 rounded-2xl bg-white border outline-none shadow-sm text-slate-700 font-medium appearance-none">
                 <option value="Beginner">Beginner</option>
                 <option value="Intermediate">Intermediate</option>
@@ -192,7 +143,7 @@ const CreateRoomScreen = ({ setCurrentScreen, user, setUser }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Tag size={16} className="text-purple-500" /> Special Requirements</label>
+              <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Tag size={16} className="text-purple-500"/> Special Requirements</label>
               <input type="text" placeholder="e.g. Female Only, Turf shoes" value={tags} onChange={(e) => setTags(e.target.value)} className="w-full p-4 rounded-2xl bg-white border outline-none shadow-sm text-slate-700 placeholder-gray-400" />
             </div>
 

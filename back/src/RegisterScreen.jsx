@@ -14,11 +14,9 @@ const RegisterScreen = ({ setUser, onSwitchToLogin }) => {
     setLoading(true);
     setError('');
 
-    // Ensure no spaces in the Profile ID
     const cleanId = profileId.trim().toLowerCase().replace(/\s+/g, '_');
 
     try {
-      // 1. Check if ID already exists
       const profileRef = doc(db, 'profiles', cleanId);
       const profileSnap = await getDoc(profileRef);
 
@@ -28,18 +26,22 @@ const RegisterScreen = ({ setUser, onSwitchToLogin }) => {
         return;
       }
 
-      // 2. Create the new user document
+      // 🔥 THE CLEAN SLATE DATABASE INITIALIZATION 🔥
       const newUser = {
         Name: name,
-        Rating: 5.0, // Start new users with a perfect 5 star!
-        Bookings: [],
-        Buddie: [],
-        Tags: ["New Player", "Friendly"]
+        Rating: 0,
+        ProfileImage: "", 
+        location: "",
+        bio: "",
+        Bookings: [], // Games = 0
+        Wins: 0,
+        Buddie: [], // Buddies = 0
+        Hosted: 0,
+        Tags: [], // Empty tags
+        sports: {} 
       };
 
       await setDoc(profileRef, newUser);
-
-      // 3. Log them in automatically
       setUser({ id: cleanId, ...newUser });
     } catch (err) {
       setError("Failed to register. Check your connection.");
@@ -80,11 +82,7 @@ const RegisterScreen = ({ setUser, onSwitchToLogin }) => {
         
         {error && <p className="text-red-400 text-sm font-bold">{error}</p>}
         
-        <button 
-          type="submit" 
-          disabled={loading}
-          className="bg-[#22c55e] p-4 rounded-xl font-bold hover:bg-green-600 transition disabled:opacity-50 flex justify-center mt-4"
-        >
+        <button type="submit" disabled={loading} className="bg-[#22c55e] p-4 rounded-xl font-bold hover:bg-green-600 transition disabled:opacity-50 flex justify-center mt-4">
           {loading ? <Loader2 className="animate-spin" /> : "Sign Up"}
         </button>
       </form>
